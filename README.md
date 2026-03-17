@@ -6,7 +6,14 @@
 [![Python Version](https://img.shields.io/badge/python-3.x-blue.svg)](https://www.python.org/downloads/)
 [![Platform](https://img.shields.io/badge/platform-Windows-lightgrey.svg)]()
 
-A persistent RESTful API wrapper for CODESYS automation software, allowing for seamless integration with other systems and automation of CODESYS operations.
+本项目旨在提供一个极速、有状态且极具大模型友好性（LLM-Friendly）的 CODESYS 命令行接口。通过在后台维护持久化的 CODESYS 会话，它不仅消除了传统脚本的启动延迟，还通过极简的 CLI 抽象层，让 AI 代理和 CI/CD 流水线能够以极低的 Token 成本和极高的稳定性自动化生成、测试和编译 PLC 控制逻辑，并为未来无缝迁移至 CODESYS Scripting 4.2.0 奠定架构基础。
+
+## 🎯 核心愿景 (Core Vision)
+
+1. **核心定位 (Core Positioning):** 打造 AI 原生（AI-Native）的极速工业编程接口，以“零协议开销”降低 Token 消耗并提升大模型直接控制 CODESYS 环境的成功率。
+2. **性能目的 (Performance Goal):** 实现“毫秒级”的持久化状态交互，彻底消除 CODESYS 每次执行脚本时的冷启动过程等待时间。
+3. **架构目的 (Architecture Goal):** 建立防过时（Future-Proof）的抽象隔离层，解耦业务逻辑与底层环境，为未来无缝切换到无用户界面的 Python 3 脚本引擎做好准备。
+4. **业务目的 (Business Goal):** 填补现代 IT 与传统 OT（操作技术）的鸿沟，让传统的重型 PLC 工业软件能够无缝接入现代的 DevOps 和 CI/CD 流水线。
 
 ## 📋 Features
 
