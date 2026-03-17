@@ -1,0 +1,28 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-ra"
+markers = [
+    "mock: tests that exercise the mock HTTP server without a CODESYS installation",
+    "codesys: tests that require a real CODESYS installation",
+]
+
+[tool.mypy]
+python_version = "3.14"
+strict = true
+warn_unused_configs = true
+files = [
+    "file_ipc.py",
+    "server_logic.py",
+    "tests/integration",
+    "tests/unit",
+    "tests/e2e/mock",
+]
+
+[[tool.mypy.overrides]]
+module = [
+    "HTTP_SERVER",
+    "PERSISTENT_SESSION",
+    "test_server",
+]
+ignore_errors = true

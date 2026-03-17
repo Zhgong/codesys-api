@@ -25,8 +25,10 @@ logging.basicConfig(
 logger = logging.getLogger('test_server')
 
 # Constants
-SERVER_HOST = '0.0.0.0'
-SERVER_PORT = 8080
+SERVER_HOST = os.environ.get("TEST_SERVER_HOST", '0.0.0.0')
+SERVER_PORT = int(os.environ.get("TEST_SERVER_PORT", "8080"))
+SESSION_START_DELAY = float(os.environ.get("TEST_SERVER_SESSION_START_DELAY", "5"))
+SCRIPT_EXECUTE_DELAY = float(os.environ.get("TEST_SERVER_SCRIPT_EXECUTE_DELAY", "10"))
 
 # Create a simple API key checker
 API_KEYS = {"admin": {"name": "Admin", "created": time.time()}}
@@ -133,8 +135,8 @@ class TestApiHandler(BaseHTTPRequestHandler):
     def handle_session_start(self):
         """Handle session/start endpoint."""
         # Simulate a slow operation
-        logger.info("Simulating slow session start (5 seconds)")
-        time.sleep(5)
+        logger.info("Simulating slow session start (%s seconds)", SESSION_START_DELAY)
+        time.sleep(SESSION_START_DELAY)
         
         self.send_json_response({
             "success": True,
@@ -150,8 +152,8 @@ class TestApiHandler(BaseHTTPRequestHandler):
         logger.debug("Script content: %s", script[:200] + ('...' if len(script) > 200 else ''))
         
         # Simulate a slow operation
-        logger.info("Simulating slow script execution (10 seconds)")
-        time.sleep(10)
+        logger.info("Simulating slow script execution (%s seconds)", SCRIPT_EXECUTE_DELAY)
+        time.sleep(SCRIPT_EXECUTE_DELAY)
         
         self.send_json_response({
             "success": True,

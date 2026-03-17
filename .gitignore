@@ -3,6 +3,8 @@
 __pycache__/
 *.py[cod]
 *$py.class
+.pytest_cache/
+.mypy_cache/
 
 # Virtual environment
 venv/
@@ -54,3 +56,7 @@ tmp/
 .DS_Store
 Thumbs.db
 **/.claude/settings.local.json
+
+
+AGENTS.md
+GEMINI.md

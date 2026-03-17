@@ -24,6 +24,23 @@ import uuid
 import shutil
 import logging
 import traceback
+from pathlib import Path
+
+from file_ipc import (
+    build_timeout_result,
+    cleanup_ipc_files,
+    cleanup_request_dir,
+    create_ipc_request,
+    determine_poll_interval,
+    read_ipc_result,
+)
+from server_logic import (
+    build_default_project_path,
+    build_status_payload,
+    normalize_project_create_params,
+    validate_pou_code_params,
+    validate_required_params,
+)
 
 # Python 3 compatibility imports
 try:
@@ -336,6 +353,7 @@ class ScriptExecutor:
         script_path = None
         result_path = None
         request_path = None
+        request_dir = None
         
         try:
             # Log script execution start with more info
@@ -343,52 +361,29 @@ class ScriptExecutor:
             script_preview = script_content[:500].replace('\n', ' ')
             logger.info("Script preview: %s...", script_preview)
             
-            # Create dedicated directory for this request to avoid path issues
-            request_dir = os.path.join(tempfile.gettempdir(), f"codesys_req_{request_id}")
-            if not os.path.exists(request_dir):
-                os.makedirs(request_dir)
-                logger.debug("Created request directory: %s", request_dir)
-            
-            # Create temporary script file with UTF-8 encoding explicitly
-            script_path = os.path.join(request_dir, "script.py")
             try:
-                with open(script_path, 'w', encoding='utf-8') as f:
-                    f.write(script_content)
+                artifacts = create_ipc_request(
+                    script_content=script_content,
+                    request_id=request_id,
+                    request_root=Path(self.request_dir),
+                    temp_root=Path(tempfile.gettempdir()),
+                )
+                request_dir = str(artifacts.request_dir)
+                script_path = str(artifacts.script_path)
+                result_path = str(artifacts.result_path)
+                request_path = str(artifacts.request_path)
                 logger.info("Created script file: %s", script_path)
                 logger.debug("Script file size: %d bytes", os.path.getsize(script_path))
-            except Exception as e:
-                logger.error("Failed to write script file: %s", str(e))
-                return {"success": False, "error": "Failed to write script file: " + str(e)}
-                
-            # Create result file path in same dedicated directory
-            result_path = os.path.join(request_dir, "result.json")
-            
-            # Create request file with backslash-escaped paths for Windows
-            request_path = os.path.join(self.request_dir, "{0}.request".format(request_id))
-            try:
-                with open(request_path, 'w', encoding='utf-8') as f:
-                    # Use double backslashes for Windows path escaping
-                    request_data = {
-                        "script_path": script_path.replace("\\", "\\\\"),
-                        "result_path": result_path.replace("\\", "\\\\"),
-                        "timestamp": time.time(),
-                        "request_id": request_id
-                    }
-                    f.write(json.dumps(request_data))
                 logger.info("Created request file: %s", request_path)
-                logger.debug("Request data: %s", json.dumps(request_data))
             except Exception as e:
-                logger.error("Failed to write request file: %s", str(e))
-                return {"success": False, "error": "Failed to write request file: " + str(e)}
+                logger.error("Failed to create IPC request: %s", str(e))
+                return {"success": False, "error": "Failed to create IPC request: " + str(e)}
                 
             # Wait for result with progressive polling
             logger.info("Waiting for script execution to complete (max: %s seconds)...", timeout)
             start_time = time.time()
             check_count = 0
             last_log_time = start_time
-            
-            # Use progressive polling intervals - start fast, then get slower
-            poll_interval = 0.1  # Start with checking every 100ms
             
             while time.time() - start_time < timeout:
                 check_count += 1
@@ -398,59 +393,20 @@ class ScriptExecutor:
                     # Log result found
                     elapsed = time.time() - start_time
                     logger.info("Result file found after %.2f seconds (%d checks)", elapsed, check_count)
-                    
-                    # Read result with retry for potentially incomplete files
-                    retry_count = 0
-                    max_retries = 5
-                    file_size = os.path.getsize(result_path)
-                    
-                    while retry_count < max_retries:
-                        try:
-                            # Wait a moment for the file to be fully written
-                            time.sleep(0.2)
-                            
-                            # Check if file size changed
-                            new_size = os.path.getsize(result_path)
-                            if new_size != file_size:
-                                logger.debug("Result file size changed from %d to %d bytes, waiting...", 
-                                            file_size, new_size)
-                                file_size = new_size
-                                retry_count += 1
-                                continue
-                            
-                            with open(result_path, 'r', encoding='utf-8') as f:
-                                content = f.read()
-                                try:
-                                    result = json.loads(content)
-                                    
-                                    # Log result summary
-                                    if result.get('success', False):
-                                        logger.info("Script execution successful")
-                                    else:
-                                        error = result.get('error', 'Unknown error')
-                                        logger.warning("Script execution failed: %s", error)
-                                    
-                                    # Cleanup files
-                                    self._cleanup_files(script_path, result_path, request_path, request_dir)
-                                    
-                                    return result
-                                except json.JSONDecodeError as je:
-                                    logger.warning("Invalid JSON in result file (attempt %d/%d): %s", 
-                                                 retry_count+1, max_retries, str(je))
-                                    logger.debug("Result file content: %s", content)
-                                    
-                                    # Try again after a short delay
-                                    retry_count += 1
-                                    time.sleep(0.5)
-                        except Exception as e:
-                            logger.warning("Error reading result file (attempt %d/%d): %s", 
-                                         retry_count+1, max_retries, str(e))
-                            retry_count += 1
-                            time.sleep(0.5)
-                    
-                    # If we get here, we've exhausted retries
-                    logger.error("Failed to read valid result after %d retries", max_retries)
-                    return {"success": False, "error": f"Failed to read valid result after {max_retries} retries"}
+                    try:
+                        result = read_ipc_result(Path(result_path))
+                    except Exception as e:
+                        logger.error("Failed to read valid result: %s", str(e))
+                        return {"success": False, "error": str(e)}
+
+                    if result.get('success', False):
+                        logger.info("Script execution successful")
+                    else:
+                        error = result.get('error', 'Unknown error')
+                        logger.warning("Script execution failed: %s", error)
+
+                    self._cleanup_files(script_path, result_path, request_path, request_dir)
+                    return result
                 
                 # Periodic status logging
                 current_time = time.time()
@@ -474,26 +430,16 @@ class ScriptExecutor:
                             
                 # Progressive polling - start fast, then slow down
                 current_elapsed = time.time() - start_time
-                if current_elapsed < 5:
-                    poll_interval = 0.1  # First 5 seconds: check every 100ms
-                elif current_elapsed < 30:
-                    poll_interval = 0.5  # 5-30 seconds: check every 500ms
-                else:
-                    poll_interval = 1.0  # After 30 seconds: check every second
-                
-                time.sleep(poll_interval)
+                time.sleep(determine_poll_interval(current_elapsed))
             
             # If we've timed out, don't create a fake success - report the timeout as an error
-            logger.error("Script execution timed out after %.2f seconds", time.time() - start_time)
+            elapsed = time.time() - start_time
+            logger.error("Script execution timed out after %.2f seconds", elapsed)
             
             # Create an error result file for future reference
             try:
                 with open(result_path, 'w', encoding='utf-8') as f:
-                    error_result = {
-                        "success": False, 
-                        "error": "Script execution timed out after {:.2f} seconds".format(time.time() - start_time),
-                        "timeout": True
-                    }
+                    error_result = build_timeout_result(elapsed)
                     json.dump(error_result, f)
             except Exception as e:
                 logger.error("Error creating timeout result file: %s", str(e))
@@ -502,41 +448,7 @@ class ScriptExecutor:
             self._cleanup_files(script_path, None, request_path, request_dir)
             
             # Return error response
-            return {
-                "success": False, 
-                "error": "Script execution timed out after {:.2f} seconds".format(time.time() - start_time),
-                "timeout": True
-            }
-            
-            # Timeout
-            elapsed = time.time() - start_time
-            logger.error("Script execution timed out after %.2f seconds (%d checks)", elapsed, check_count)
-            
-            # Create error result file for reference
-            try:
-                with open(result_path, 'w', encoding='utf-8') as f:
-                    error_result = {
-                        "success": False,
-                        "error": f"Script execution timed out after {timeout} seconds",
-                        "checks": check_count,
-                        "request_id": request_id
-                    }
-                    json.dump(error_result, f)
-                logger.debug("Created timeout error result file")
-            except Exception as e:
-                logger.error("Error creating timeout error result file: %s", str(e))
-            
-            # Clean up files but keep script for debugging
-            self._cleanup_files(None, None, request_path, None)
-            logger.info("Kept script file for debugging: %s", script_path)
-            
-            return {
-                "success": False, 
-                "error": f"Script execution timed out after {timeout} seconds",
-                "script_path": script_path,
-                "result_path": result_path,
-                "request_id": request_id
-            }
+            return build_timeout_result(elapsed)
         except Exception as e:
             logger.error("Error executing script (request ID: %s): %s", request_id, str(e))
             logger.error(traceback.format_exc())
@@ -560,18 +472,16 @@ class ScriptExecutor:
                 continue
                 
             try:
-                if os.path.exists(path):
-                    os.remove(path)
-                    logger.debug("Removed temporary file: %s", path)
+                cleanup_ipc_files(path)
+                logger.debug("Removed temporary file: %s", path)
             except Exception as e:
                 logger.warning("Failed to remove temporary file %s: %s", path, str(e))
         
         # Then clean up the request directory if specified
         if request_dir and os.path.exists(request_dir):
             try:
-                # Check if directory is empty
                 if not os.listdir(request_dir):
-                    os.rmdir(request_dir)
+                    cleanup_request_dir(request_dir)
                     logger.debug("Removed empty request directory: %s", request_dir)
                 else:
                     logger.warning("Request directory not empty, not removing: %s", request_dir)
@@ -2271,22 +2181,15 @@ class CodesysApiHandler(BaseHTTPRequestHandler):
             logger.info("Executing session status script in CODESYS")
             status_result = self.script_executor.execute_script(script)
             
-            if status_result.get("success", False) and "status" in status_result:
-                session_status = status_result["status"]
-            else:
-                session_status = {"active": process_running, "session_active": process_running, "project_open": False}
         else:
-            session_status = {"active": False, "session_active": False, "project_open": False}
-                
-        # Combine status information
-        status = {
-            "process": {
-                "running": process_running,
-                "state": process_status.get("state", "unknown"),
-                "timestamp": process_status.get("timestamp", time.time())
-            },
-            "session": session_status
-        }
+            status_result = None
+
+        status = build_status_payload(
+            process_running=process_running,
+            process_status=process_status,
+            session_status_result=status_result,
+            now=time.time(),
+        )
         
         self.send_json_response({
             "success": True,
@@ -2295,13 +2198,12 @@ class CodesysApiHandler(BaseHTTPRequestHandler):
         
     def handle_project_create(self, params):
         """Handle project/create endpoint."""
-        if "path" not in params:
-            # If path is not provided, use the current directory
-            script_dir = os.path.dirname(os.path.abspath(__file__))
-            timestamp = time.strftime("%Y%m%d_%H%M%S")
-            default_path = os.path.join(script_dir, f"CODESYS_Project_{timestamp}.project")
-            logger.info("No path provided, using default path: %s", default_path)
-            params["path"] = default_path
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        timestamp = time.strftime("%Y%m%d_%H%M%S")
+        params = normalize_project_create_params(params, script_dir, timestamp)
+
+        if params["path"] == build_default_project_path(script_dir, timestamp):
+            logger.info("No path provided, using default path: %s", params["path"])
         
         # Allow specifying a template path (optional)
         template_path = params.get("template_path", "")
@@ -2481,14 +2383,13 @@ class CodesysApiHandler(BaseHTTPRequestHandler):
         
     def handle_pou_create(self, params):
         """Handle pou/create endpoint."""
-        required = ["name", "type", "language"]
-        for field in required:
-            if field not in params:
-                self.send_json_response({
-                    "success": False,
-                    "error": "Missing required parameter: " + field
-                }, 400)
-                return
+        error = validate_required_params(params, ["name", "type", "language"])
+        if error is not None:
+            self.send_json_response({
+                "success": False,
+                "error": error
+            }, 400)
+            return
                 
         name = params.get("name", "")
         pou_type = params.get("type", "FunctionBlock")
@@ -2515,20 +2416,11 @@ class CodesysApiHandler(BaseHTTPRequestHandler):
         
     def handle_pou_code(self, params):
         """Handle pou/code endpoint."""
-        # Check that we have path and at least one of: code, declaration, or implementation
-        if "path" not in params:
+        error = validate_pou_code_params(params)
+        if error is not None:
             self.send_json_response({
                 "success": False,
-                "error": "Missing required parameter: path"
-            }, 400)
-            return
-            
-        # Check that we have some code to set
-        has_code = any(key in params for key in ["code", "declaration", "implementation"])
-        if not has_code:
-            self.send_json_response({
-                "success": False,
-                "error": "Missing code parameter: need at least one of 'code', 'declaration', or 'implementation'"
+                "error": error
             }, 400)
             return
                 
