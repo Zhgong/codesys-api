@@ -2,8 +2,9 @@
 
 ## Current State
 
-The host-side refactor and the engine adapter landing phase are now complete enough
-to support a real CODESYS happy-path E2E.
+The host-side refactor, engine adapter landing, runtime hardening, and transport
+dual-stack work are now far enough along to support both fast and full real
+CODESYS acceptance.
 
 Completed so far:
 
@@ -15,6 +16,10 @@ Completed so far:
   - `api_key_store.py`
   - `server_config.py`
   - `action_layer.py`
+  - `engine_adapter.py`
+  - `ironpython_script_engine.py`
+  - `named_pipe_transport.py`
+  - `session_transport.py`
 - Moved these endpoints behind the action layer:
   - `session/start`
   - `session/stop`
@@ -34,23 +39,12 @@ Completed so far:
   - explicit profile support
   - optional `--noUI` via env var
 - Completed the engine adapter landing phase:
-  - added `engine_adapter.py`
-  - added `ironpython_script_engine.py`
   - wired `HTTP_SERVER.py` to instantiate `IronPythonScriptEngineAdapter`
   - removed the legacy in-file script generator from `HTTP_SERVER.py`
   - added adapter metadata and capability reporting
   - added capability gating in `action_layer.py` for engine-supported actions
   - changed `action_layer.py` to depend on the formal engine adapter contract
   - changed the adapter to expose `build_execution()` and `normalize_result()`
-- Updated `.gitignore` for CODESYS smoke-run artifacts
-- Removed the duplicate `handle_project_compile` and duplicate `generate_project_compile_script`
-- Added a real `pytest` CODESYS E2E path under `tests/e2e/codesys`
-- Verified real CODESYS happy path:
-  - `session/start`
-  - `project/create`
-  - `pou/create`
-  - `pou/code`
-  - `project/compile`
 - Added automatic `project.compile` fallback for `--noUI` sessions:
   - save active project
   - stop CODESYS
@@ -58,13 +52,16 @@ Completed so far:
   - reinitialize session
   - reopen project
   - compile automatically without manual intervention
-- Added runtime-mode reset after explicit `session/stop` and `session/restart`:
-  - successful `project.compile` fallback keeps the current live session in UI mode
-  - explicit stop/restart returns future launches to the configured mode
-- Expanded the real CODESYS E2E suite to cover:
-  - fast main track: `session/start -> session/status -> project/create -> pou/create -> pou/code -> project/compile`
-  - slow track: repeated `session/start` / `session/stop`, `session/restart`, and compile-without-project failure semantics
-  - full happy-path compile flow under `CODESYS_E2E_NO_UI=true`
+- Added runtime-mode reset after explicit `session/stop` and `session/restart`
+- Added transport dual-stack support:
+  - `file` transport
+  - `named_pipe` transport
+  - host-side transport selection through config
+  - CODESYS-side named-pipe listener in `PERSISTENT_SESSION.py`
+- Added real `pytest` CODESYS E2E under `tests/e2e/codesys`
+- Split real CODESYS acceptance into:
+  - fast main track
+  - slow runtime-hardening track
 
 ## Verification Status
 
@@ -73,7 +70,7 @@ These commands were green at the end of the session:
 ```powershell
 python -m pytest -q
 python -m mypy
-python -m py_compile HTTP_SERVER.py action_layer.py api_key_store.py codesys_process.py server_config.py file_ipc.py server_logic.py test_server.py ironpython_script_engine.py engine_adapter.py
+python -m py_compile HTTP_SERVER.py action_layer.py api_key_store.py codesys_process.py server_config.py file_ipc.py server_logic.py test_server.py ironpython_script_engine.py engine_adapter.py named_pipe_transport.py session_transport.py tests/e2e/codesys/test_real_codesys_e2e.py
 ```
 
 Expected results at handoff:
@@ -83,6 +80,12 @@ Expected results at handoff:
 - `pytest -m codesys`: full real acceptance entrypoint
 - `mypy`: success with no issues
 
+Verified real acceptance results:
+
+- Fast real acceptance passes with `CODESYS_E2E_TRANSPORT=file`
+- Fast real acceptance passes with `CODESYS_E2E_TRANSPORT=named_pipe`
+- Full slow real acceptance also passes with `CODESYS_E2E_TRANSPORT=named_pipe`
+
 ## Important Constraints
 
 - Do not try to strictly type `PERSISTENT_SESSION.py` or injected CODESYS script bodies yet.
@@ -90,31 +93,27 @@ Expected results at handoff:
 - `CODESYS_API_CODESYS_NO_UI` is opt-in; it is not the default.
 - Do not hardcode local machine CODESYS paths into repo defaults.
 - Real CODESYS compile succeeds on this machine with `CODESYS_API_CODESYS_NO_UI=false`.
-- Real CODESYS compile now also succeeds with `CODESYS_API_CODESYS_NO_UI=true` via automatic host-side fallback to UI mode for the compile path.
+- Real CODESYS compile also succeeds with `CODESYS_API_CODESYS_NO_UI=true` via automatic host-side fallback to UI mode for the compile path.
 - After a noUI compile fallback, the live session stays in UI mode until explicit `session/stop` or `session/restart`.
-- The fast real acceptance track currently passes in about one minute with `CODESYS_E2E_TRANSPORT=file`.
-- The fast real acceptance track now also passes in about one minute with `CODESYS_E2E_TRANSPORT=named_pipe`.
+- Keep real E2E speedup separate from future transport tuning work.
 
 ## Next Best Steps
 
-1. Decide whether the next phase is:
-   - transport evolution
-   - more real-environment hardening beyond the current session lifecycle coverage
-   - or CLI work
-2. Keep the real CODESYS E2E as the phase-boundary runtime acceptance test, not just a happy-path smoke.
-3. Do not reopen the `--noUI` compile issue unless new regressions appear.
-4. Keep “real E2E speedup” separate from the remaining named-pipe runtime compatibility work.
+1. Continue transport evolution, now that both fast and full real acceptance pass with `named_pipe`.
+2. Focus on transport diagnostics, edge-case recovery, and simplifying the remaining dual-stack behavior.
+3. Keep the real CODESYS E2E as the phase-boundary runtime acceptance test, not just a happy-path smoke.
+4. Do not reopen the `--noUI` compile issue unless new regressions appear.
 
 ## Recommended Sequence For Next Session
 
-Start by choosing between transport work, broader runtime hardening, and CLI.
+Start with transport work.
 
 Reason:
 
-- The host-side seams and engine adapter seam are now active
-- The main happy path is already verified end-to-end against real CODESYS
-- The biggest runtime-specific regression has been closed
-- CLI is still lower priority than runtime correctness and transport reliability
+- The host-side seams and engine adapter seam are active
+- The real happy path is already verified end-to-end
+- The slow runtime-hardening track is now also verified with `named_pipe`
+- CLI is still lower priority than transport reliability
 
 ## Quick Resume Checklist
 
@@ -129,14 +128,26 @@ python -m mypy
 git status --short
 ```
 
-5. Start the next phase by filling in the phase goal card from `COLLABORATION_TEMPLATE.md`
-6. If running real CODESYS E2E:
+5. If running real CODESYS fast acceptance:
 
 ```powershell
 $env:CODESYS_E2E_ENABLE="1"
 $env:CODESYS_API_CODESYS_PATH="..."
 $env:CODESYS_API_CODESYS_PROFILE="..."
 $env:CODESYS_API_CODESYS_PROFILE_PATH="..."
-$env:CODESYS_E2E_NO_UI="false"
+$env:CODESYS_E2E_NO_UI="true"
+$env:CODESYS_E2E_TRANSPORT="named_pipe"
 python -m pytest -q -m "codesys and not codesys_slow" tests/e2e/codesys
+```
+
+6. If running full real CODESYS acceptance:
+
+```powershell
+$env:CODESYS_E2E_ENABLE="1"
+$env:CODESYS_API_CODESYS_PATH="..."
+$env:CODESYS_API_CODESYS_PROFILE="..."
+$env:CODESYS_API_CODESYS_PROFILE_PATH="..."
+$env:CODESYS_E2E_NO_UI="true"
+$env:CODESYS_E2E_TRANSPORT="named_pipe"
+python -m pytest -q -m codesys tests/e2e/codesys
 ```

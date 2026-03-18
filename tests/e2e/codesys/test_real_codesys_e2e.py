@@ -243,6 +243,7 @@ def test_real_codesys_compile_without_active_project_fails_cleanly(
     base_url, _process = real_server
     stop_session(base_url)
     start_session(base_url)
+    project_path = str(Path(tempfile.gettempdir()) / f"codesys_api_compile_recovery_{int(time.time())}.project")
 
     status_code, payload = call_json(
         base_url,
@@ -255,6 +256,16 @@ def test_real_codesys_compile_without_active_project_fails_cleanly(
     assert status_code == 500
     assert payload["success"] is False
     assert "active project" in str(payload["error"]).lower()
+
+    status_code, payload = call_json(
+        base_url,
+        "/api/v1/project/create",
+        method="POST",
+        payload={"path": project_path},
+        timeout=120,
+    )
+    assert status_code == 200
+    assert payload["success"] is True
 
     status_code, payload = call_json(
         base_url,
