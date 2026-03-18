@@ -299,15 +299,12 @@ class CodesysPersistentSession(object):
                     self.log("Waiting for named pipe client on: " + PIPE_NAME)
                     server.WaitForConnection()
                     self.log("Named pipe client connected on: " + PIPE_NAME)
-                    request = self.read_named_pipe_request(server)
+                    request = self.normalize_named_pipe_request(self.read_named_pipe_request(server))
                     request_id = request.get("request_id", "unknown")
                     self.log("Processing named pipe request: " + str(request_id))
-                    script_code = request.get("script")
-                    if not script_code:
-                        raise ValueError("Named pipe request missing script")
+                    script_code = request["script"]
                     result = self.execute_script_content(script_code, "named_pipe:" + str(request_id))
-                    if isinstance(result, dict):
-                        result["request_id"] = request_id
+                    result = self.normalize_named_pipe_result(result, request_id)
                     self.write_named_pipe_result(server, result)
                     self.log("Named pipe request completed: " + str(request_id))
                 except Exception, e:
@@ -315,11 +312,7 @@ class CodesysPersistentSession(object):
                     self.log(traceback.format_exc())
                     try:
                         if server is not None and server.IsConnected:
-                            self.write_named_pipe_result(server, {
-                                "success": False,
-                                "error": str(e),
-                                "request_id": request_id,
-                            })
+                            self.write_named_pipe_result(server, self.build_named_pipe_failure_response(request_id, str(e)))
                     except Exception, write_e:
                         self.log("Error writing named pipe failure response: " + str(write_e))
                 finally:
@@ -356,6 +349,53 @@ class CodesysPersistentSession(object):
         if not isinstance(request, dict):
             raise ValueError("Named pipe request payload must be a JSON object")
         return request
+
+    def normalize_named_pipe_request(self, request):
+        """Validate and normalize a named-pipe request envelope."""
+        required_fields = ("request_id", "script", "timeout_hint", "created_at")
+        for field_name in required_fields:
+            if field_name not in request:
+                raise ValueError("Named pipe request missing required field: " + str(field_name))
+        for field_name in ("request_id", "script"):
+            field_value = request.get(field_name)
+            if not isinstance(field_value, basestring) or not field_value.strip():
+                raise ValueError("Named pipe request field must not be empty: " + str(field_name))
+        timeout_hint = request.get("timeout_hint")
+        created_at = request.get("created_at")
+        if not isinstance(timeout_hint, (int, long, float)):
+            raise ValueError("Named pipe request field must be numeric: timeout_hint")
+        if not isinstance(created_at, (int, long, float)):
+            raise ValueError("Named pipe request field must be numeric: created_at")
+        return {
+            "request_id": request["request_id"],
+            "script": request["script"],
+            "timeout_hint": timeout_hint,
+            "created_at": created_at,
+        }
+
+    def build_named_pipe_failure_response(self, request_id, error):
+        """Build a normalized named-pipe failure response."""
+        return {
+            "success": False,
+            "error": error,
+            "request_id": request_id,
+        }
+
+    def normalize_named_pipe_result(self, result, request_id):
+        """Normalize a named-pipe response before writing it back."""
+        if isinstance(result, dict):
+            normalized = dict(result)
+        else:
+            normalized = {
+                "success": True,
+                "result": result,
+            }
+        normalized["request_id"] = request_id
+        if "success" not in normalized:
+            normalized["success"] = "error" not in normalized
+        if not normalized.get("success") and "error" not in normalized:
+            normalized["error"] = "Named pipe request failed without an explicit error"
+        return normalized
 
     def write_named_pipe_result(self, server, result):
         """Write a named pipe response."""
