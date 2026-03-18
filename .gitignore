@@ -39,6 +39,13 @@ tmp/
 *.tmp
 *.bak
 *.swp
+*.~u
+*.precompilecache
+*-AllUsers.opt
+*-*-*.opt
+real_smoke_*.project
+real_server_stdout.log
+real_server_stderr.log
 
 # Windows service-related
 *.exe

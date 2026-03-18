@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, cast
 
 from HTTP_SERVER import ScriptExecutor
+from session_transport import FileScriptTransport
 
 
 def wait_for_request_file(request_dir: Path) -> Path:
@@ -26,7 +27,13 @@ def test_script_executor_returns_result_from_ipc(tmp_path: Path) -> None:
     result_dir.mkdir()
 
     executor_factory = cast(Any, ScriptExecutor)
-    executor = executor_factory(str(request_dir), str(result_dir))
+    transport = FileScriptTransport(
+        request_dir=request_dir,
+        result_dir=result_dir,
+        temp_root=tmp_path / "temp",
+    )
+    transport.temp_root.mkdir()
+    executor = executor_factory(transport)
 
     def responder() -> None:
         request_file = wait_for_request_file(request_dir)
@@ -55,9 +62,33 @@ def test_script_executor_returns_timeout_result_when_no_ipc_response_arrives(tmp
     result_dir.mkdir()
 
     executor_factory = cast(Any, ScriptExecutor)
-    executor = executor_factory(str(request_dir), str(result_dir))
+    transport = FileScriptTransport(
+        request_dir=request_dir,
+        result_dir=result_dir,
+        temp_root=tmp_path / "temp",
+    )
+    transport.temp_root.mkdir()
+    executor = executor_factory(transport)
 
     result = executor.execute_script("print('hello')", timeout=0.2)
 
     assert result["success"] is False
     assert result["timeout"] is True
+
+
+def test_script_executor_delegates_to_transport() -> None:
+    calls: list[tuple[str, int]] = []
+
+    class FakeTransport:
+        def execute_script(self, script_content: str, timeout: int = 60) -> dict[str, object]:
+            calls.append((script_content, timeout))
+            return {"success": True, "message": "ok"}
+
+    executor_factory = cast(Any, ScriptExecutor)
+    executor = executor_factory(FakeTransport())
+
+    result = executor.execute_script("print('hello')", timeout=2)
+
+    assert calls == [("print('hello')", 2)]
+    assert result["success"] is True
+    assert result["message"] == "ok"

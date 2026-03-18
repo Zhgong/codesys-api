@@ -5,6 +5,8 @@ addopts = "-ra"
 markers = [
     "mock: tests that exercise the mock HTTP server without a CODESYS installation",
     "codesys: tests that require a real CODESYS installation",
+    "codesys_main: fast real-CODESYS acceptance path that minimizes cold starts",
+    "codesys_slow: slower real-CODESYS runtime hardening checks",
 ]
 
 [tool.mypy]
@@ -12,10 +14,17 @@ python_version = "3.14"
 strict = true
 warn_unused_configs = true
 files = [
+    "action_layer.py",
+    "api_key_store.py",
+    "codesys_process.py",
+    "engine_adapter.py",
     "file_ipc.py",
+    "ironpython_script_engine.py",
+    "server_config.py",
     "server_logic.py",
     "tests/integration",
     "tests/unit",
+    "tests/e2e/codesys",
     "tests/e2e/mock",
 ]
 

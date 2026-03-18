@@ -23,6 +23,25 @@ import traceback
 import threading
 import warnings
 
+NAMED_PIPE_SUPPORT = False
+NAMED_PIPE_IMPORT_ERROR = None
+try:
+    import clr
+    try:
+        clr.AddReference("System")
+    except Exception:
+        pass
+    try:
+        clr.AddReference("System.Core")
+    except Exception:
+        pass
+    from System import Array, Byte
+    from System.IO.Pipes import NamedPipeServerStream, PipeDirection, PipeTransmissionMode, PipeOptions
+    from System.Text import Encoding
+    NAMED_PIPE_SUPPORT = True
+except Exception, named_pipe_import_e:
+    NAMED_PIPE_IMPORT_ERROR = str(named_pipe_import_e)
+
 # Silence deprecation warnings for sys.exc_clear() in IronPython 2.7
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
@@ -37,6 +56,8 @@ RESULT_DIR = os.path.join(SCRIPT_DIR, "results")
 TERMINATION_SIGNAL_FILE = os.path.join(SCRIPT_DIR, "terminate.signal")
 STATUS_FILE = os.path.join(SCRIPT_DIR, "session_status.json")
 LOG_FILE = os.path.join(SCRIPT_DIR, "session.log")
+TRANSPORT_NAME = os.environ.get("CODESYS_API_TRANSPORT", "named_pipe").strip().lower()
+PIPE_NAME = os.environ.get("CODESYS_API_PIPE_NAME", "codesys_api_session")
 
 # Ensure directories exist
 for directory in [REQUEST_DIR, RESULT_DIR]:
@@ -63,6 +84,10 @@ class CodesysPersistentSession(object):
             self.log("Script directory: " + SCRIPT_DIR)
             self.log("Request directory: " + REQUEST_DIR)
             self.log("Result directory: " + RESULT_DIR)
+            self.log("Transport: " + TRANSPORT_NAME)
+            self.log("Pipe name: " + PIPE_NAME)
+            if not NAMED_PIPE_SUPPORT:
+                self.log("Named pipe import status: " + str(NAMED_PIPE_IMPORT_ERROR))
             
             # Write early status file to indicate script has started
             try:
@@ -161,6 +186,10 @@ class CodesysPersistentSession(object):
             })
             
             self.init_success = True
+            if TRANSPORT_NAME == "named_pipe" and not NAMED_PIPE_SUPPORT:
+                self.log("Named pipe transport requested but .NET named pipe support is unavailable: " + str(NAMED_PIPE_IMPORT_ERROR))
+                self.init_success = False
+                return False
             if self.system is not None:
                 self.log("Initialization successful with working system")
             else:
@@ -191,7 +220,10 @@ class CodesysPersistentSession(object):
             return False
             
         # Start request processing thread
-        self.request_thread = threading.Thread(target=self.process_requests)
+        if TRANSPORT_NAME == "named_pipe":
+            self.request_thread = threading.Thread(target=self.process_named_pipe_requests)
+        else:
+            self.request_thread = threading.Thread(target=self.process_requests)
         self.request_thread.daemon = True
         self.request_thread.start()
         
@@ -249,6 +281,104 @@ class CodesysPersistentSession(object):
                 
             # Sleep briefly
             time.sleep(0.1)
+
+    def process_named_pipe_requests(self):
+        """Process script execution requests over a named pipe."""
+        server = None
+        try:
+            server = NamedPipeServerStream(
+                PIPE_NAME,
+                PipeDirection.InOut,
+                1,
+                PipeTransmissionMode.Byte,
+                PipeOptions.None
+            )
+            while self.running:
+                try:
+                    self.log("Waiting for named pipe client on: " + PIPE_NAME)
+                    server.WaitForConnection()
+                    self.log("Named pipe client connected on: " + PIPE_NAME)
+                    request = self.read_named_pipe_request(server)
+                    request_id = request.get("request_id", "unknown")
+                    self.log("Processing named pipe request: " + str(request_id))
+                    script_code = request.get("script")
+                    if not script_code:
+                        raise ValueError("Named pipe request missing script")
+                    result = self.execute_script_content(script_code, "named_pipe:" + str(request_id))
+                    if isinstance(result, dict):
+                        result["request_id"] = request_id
+                    self.write_named_pipe_result(server, result)
+                    self.log("Named pipe request completed: " + str(request_id))
+                except Exception, e:
+                    self.log("Error processing named pipe request: " + str(e))
+                    self.log(traceback.format_exc())
+                    try:
+                        if server is not None and server.IsConnected:
+                            self.write_named_pipe_result(server, {
+                                "success": False,
+                                "error": str(e)
+                            })
+                    except Exception, write_e:
+                        self.log("Error writing named pipe failure response: " + str(write_e))
+                finally:
+                    try:
+                        if server is not None and server.IsConnected:
+                            server.Disconnect()
+                            self.log("Named pipe client disconnected from: " + PIPE_NAME)
+                    except Exception, disconnect_e:
+                        self.log("Error disconnecting named pipe client: " + str(disconnect_e))
+        except Exception, outer_e:
+            self.log("Fatal named pipe listener error: " + str(outer_e))
+            self.log(traceback.format_exc())
+        finally:
+            try:
+                if server is not None:
+                    if server.IsConnected:
+                        server.Disconnect()
+                    server.Close()
+            except Exception:
+                pass
+
+    def read_named_pipe_request(self, server):
+        """Read a single named pipe request."""
+        header = self.read_exact_bytes(server, 4)
+        message_size = (
+            ord(header[0]) |
+            (ord(header[1]) << 8) |
+            (ord(header[2]) << 16) |
+            (ord(header[3]) << 24)
+        )
+        payload = self.read_exact_bytes(server, message_size)
+        request = json.loads(payload)
+        if not isinstance(request, dict):
+            raise ValueError("Named pipe request payload must be a JSON object")
+        return request
+
+    def write_named_pipe_result(self, server, result):
+        """Write a named pipe response."""
+        body = json.dumps(result)
+        body_bytes = Encoding.UTF8.GetBytes(body)
+        size = body_bytes.Length
+        header = Array[Byte]([
+            size & 0xFF,
+            (size >> 8) & 0xFF,
+            (size >> 16) & 0xFF,
+            (size >> 24) & 0xFF,
+        ])
+        server.Write(header, 0, 4)
+        server.Write(body_bytes, 0, size)
+        server.Flush()
+
+    def read_exact_bytes(self, stream, size):
+        """Read an exact number of bytes from a .NET stream."""
+        buffer = Array.CreateInstance(Byte, size)
+        offset = 0
+        while offset < size:
+            count = stream.Read(buffer, offset, size - offset)
+            if count == 0:
+                raise IOError("Named pipe stream closed before enough data was read")
+            offset += count
+        return "".join(chr(int(item)) for item in buffer)
             
     def process_request(self, request_path):
         """Process a single request."""
@@ -394,9 +524,34 @@ class CodesysPersistentSession(object):
                     "error": "Error loading script: %s" % str(load_e),
                     "traceback": traceback.format_exc()
                 }
-                
-            # Execute script
-            self.log("Executing script code...")
+            return self.execute_script_content(script_code, script_path)
+        except Exception, e:
+            self.log("Unhandled error in execute_script: %s" % str(e))
+            self.log(traceback.format_exc())
+            return {
+                "success": False,
+                "error": str(e),
+                "traceback": traceback.format_exc(),
+                "execution_time": time.time(),
+                "executed_by": "CODESYS PersistentSession"
+            }
+
+    def execute_script_content(self, script_code, script_label):
+        """Execute already-loaded script code in the CODESYS environment."""
+        try:
+            globals_dict = {
+                "session": self,
+                "system": self.system,
+                "active_project": self.active_project,
+                "json": json,
+                "os": os,
+                "time": time,
+                "scriptengine": scriptengine,
+                "traceback": traceback,
+                "sys": sys
+            }
+
+            self.log("Executing script code from: %s" % script_label)
             local_vars = {}
             try:
                 exec(script_code, globals_dict, local_vars)
@@ -410,29 +565,25 @@ class CodesysPersistentSession(object):
                     "traceback": traceback.format_exc(),
                     "execution_failed": True
                 }
-            
-            # Check for result
+
             self.log("Checking for result variable...")
             if "result" in local_vars:
                 self.log("Result variable found")
                 result = local_vars["result"]
-                
-                # Add execution metadata
                 if isinstance(result, dict):
                     result["execution_time"] = time.time()
                     result["executed_by"] = "CODESYS PersistentSession"
-                
                 return result
-            else:
-                self.log("No result variable found, returning default success")
-                return {
-                    "success": True, 
-                    "message": "Script executed successfully (no result variable)",
-                    "execution_time": time.time(),
-                    "executed_by": "CODESYS PersistentSession"
-                }
+
+            self.log("No result variable found, returning default success")
+            return {
+                "success": True,
+                "message": "Script executed successfully (no result variable)",
+                "execution_time": time.time(),
+                "executed_by": "CODESYS PersistentSession"
+            }
         except Exception, e:
-            self.log("Unhandled error in execute_script: %s" % str(e))
+            self.log("Unhandled error in execute_script_content: %s" % str(e))
             self.log(traceback.format_exc())
             return {
                 "success": False,
