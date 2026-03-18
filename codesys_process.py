@@ -10,6 +10,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Protocol, cast
 
+from named_pipe_transport import wait_for_named_pipe_listener
+
 
 class ProcessLike(Protocol):
     def poll(self) -> int | None: ...
@@ -24,6 +26,7 @@ class ProcessLike(Protocol):
 PopenFactory = Callable[..., ProcessLike]
 SleepFn = Callable[[float], None]
 NowFn = Callable[[], float]
+PipeReadyFn = Callable[[str, float], bool]
 
 
 def default_popen_factory(command: str, **kwargs: Any) -> ProcessLike:
@@ -41,6 +44,8 @@ class ProcessManagerConfig:
     profile_name: str | None = None
     profile_path: Path | None = None
     no_ui: bool = True
+    transport_name: str = "file"
+    pipe_name: str | None = None
 
 
 class CodesysProcessManager:
@@ -55,9 +60,11 @@ class CodesysProcessManager:
         startup_timeout: float = 30.0,
         startup_poll_interval: float = 1.0,
         initialization_wait: float = 10.0,
+        pipe_ready_timeout: float = 90.0,
         stop_timeout: float = 10.0,
         stop_poll_interval: float = 0.5,
         post_terminate_wait: float = 2.0,
+        pipe_ready_fn: PipeReadyFn = wait_for_named_pipe_listener,
     ) -> None:
         self.config = config
         self.logger = logger
@@ -67,9 +74,11 @@ class CodesysProcessManager:
         self.startup_timeout = startup_timeout
         self.startup_poll_interval = startup_poll_interval
         self.initialization_wait = initialization_wait
+        self.pipe_ready_timeout = pipe_ready_timeout
         self.stop_timeout = stop_timeout
         self.stop_poll_interval = stop_poll_interval
         self.post_terminate_wait = post_terminate_wait
+        self.pipe_ready_fn = pipe_ready_fn
         self.process: ProcessLike | None = None
         self.running = False
         self.lock = threading.Lock()
@@ -150,6 +159,19 @@ class CodesysProcessManager:
                 if not self.config.status_file.exists():
                     self.logger.warning("CODESYS started but didn't create status file. Creating a default one.")
                     self._write_default_status("initialized")
+
+                if self.config.transport_name == "named_pipe":
+                    if not self.config.pipe_name:
+                        self.logger.error("Named pipe transport requires a pipe_name")
+                        return False
+                    self.logger.info("Waiting for named pipe listener: %s", self.config.pipe_name)
+                    if not self.pipe_ready_fn(self.config.pipe_name, self.pipe_ready_timeout):
+                        self.logger.error(
+                            "Named pipe listener did not become ready within %.1f seconds",
+                            self.pipe_ready_timeout,
+                        )
+                        return False
+                    self.logger.info("Named pipe listener is ready: %s", self.config.pipe_name)
 
                 self.running = True
                 self.logger.info("CODESYS process started and fully initialized")

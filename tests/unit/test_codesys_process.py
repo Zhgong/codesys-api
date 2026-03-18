@@ -56,6 +56,7 @@ def make_config(tmp_path: Path) -> ProcessManagerConfig:
         script_lib_dir=tmp_path / "ScriptLib",
         profile_name="CODESYS V3.5 SP20 Patch 5",
         profile_path=tmp_path / "Profiles" / "CODESYS V3.5 SP20 Patch 5.profile.xml",
+        transport_name="file",
     )
 
 
@@ -103,6 +104,87 @@ def test_start_creates_default_status_file_after_successful_launch(tmp_path: Pat
     assert config.status_file.exists() is True
     payload = json.loads(config.status_file.read_text(encoding="utf-8"))
     assert payload["state"] == "initialized"
+
+
+def test_start_waits_for_named_pipe_listener_when_named_pipe_transport_is_enabled(tmp_path: Path) -> None:
+    config = make_config(tmp_path)
+    config = ProcessManagerConfig(
+        codesys_path=config.codesys_path,
+        script_path=config.script_path,
+        status_file=config.status_file,
+        termination_signal_file=config.termination_signal_file,
+        log_file=config.log_file,
+        script_lib_dir=config.script_lib_dir,
+        profile_name=config.profile_name,
+        profile_path=config.profile_path,
+        no_ui=config.no_ui,
+        transport_name="named_pipe",
+        pipe_name="codesys_api_test_pipe",
+    )
+    config.codesys_path.write_text("exe", encoding="utf-8")
+    config.script_path.write_text("# script", encoding="utf-8")
+    assert config.profile_path is not None
+    config.profile_path.parent.mkdir(parents=True, exist_ok=True)
+    config.profile_path.write_text("<Profile />", encoding="utf-8")
+    config.script_lib_dir.mkdir()
+    process = FakeProcess([None, None])
+    popen_factory = FakePopenFactory(process)
+    calls: list[tuple[str, float]] = []
+
+    def record_pipe_ready(pipe_name: str, timeout: float) -> bool:
+        calls.append((pipe_name, timeout))
+        return True
+
+    manager = CodesysProcessManager(
+        config,
+        logger=logging.getLogger("codesys_process_test"),
+        popen_factory=popen_factory,
+        sleep_fn=lambda _seconds: None,
+        startup_timeout=0.0,
+        initialization_wait=0.0,
+        pipe_ready_timeout=5.0,
+        pipe_ready_fn=record_pipe_ready,
+    )
+
+    assert manager.start() is True
+    assert calls == [("codesys_api_test_pipe", 5.0)]
+
+
+def test_start_returns_false_when_named_pipe_listener_never_becomes_ready(tmp_path: Path) -> None:
+    config = make_config(tmp_path)
+    config = ProcessManagerConfig(
+        codesys_path=config.codesys_path,
+        script_path=config.script_path,
+        status_file=config.status_file,
+        termination_signal_file=config.termination_signal_file,
+        log_file=config.log_file,
+        script_lib_dir=config.script_lib_dir,
+        profile_name=config.profile_name,
+        profile_path=config.profile_path,
+        no_ui=config.no_ui,
+        transport_name="named_pipe",
+        pipe_name="codesys_api_test_pipe",
+    )
+    config.codesys_path.write_text("exe", encoding="utf-8")
+    config.script_path.write_text("# script", encoding="utf-8")
+    assert config.profile_path is not None
+    config.profile_path.parent.mkdir(parents=True, exist_ok=True)
+    config.profile_path.write_text("<Profile />", encoding="utf-8")
+    config.script_lib_dir.mkdir()
+    process = FakeProcess([None, None])
+    popen_factory = FakePopenFactory(process)
+    manager = CodesysProcessManager(
+        config,
+        logger=logging.getLogger("codesys_process_test"),
+        popen_factory=popen_factory,
+        sleep_fn=lambda _seconds: None,
+        startup_timeout=0.0,
+        initialization_wait=0.0,
+        pipe_ready_timeout=5.0,
+        pipe_ready_fn=lambda _pipe_name, _timeout: False,
+    )
+
+    assert manager.start() is False
 
 
 def test_start_returns_false_when_profile_configuration_is_missing(tmp_path: Path) -> None:

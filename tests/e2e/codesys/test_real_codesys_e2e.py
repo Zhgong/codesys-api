@@ -7,6 +7,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import uuid
 from collections.abc import Generator
 from pathlib import Path
 from typing import Any
@@ -16,6 +17,7 @@ import pytest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
+REAL_COMPILE_TIMEOUT = 300
 
 
 def find_free_port() -> int:
@@ -73,24 +75,58 @@ def wait_for_server(base_url: str) -> None:
     raise RuntimeError("Real CODESYS server did not become ready in time")
 
 
+def wait_for_session_state(
+    base_url: str,
+    *,
+    process_running: bool,
+    session_active: bool | None = None,
+    timeout: int = 40,
+) -> None:
+    deadline = time.time() + timeout
+    last_payload: dict[str, Any] | None = None
+
+    while time.time() < deadline:
+        status_code, payload = session_status(base_url)
+        last_payload = payload
+        if status_code == 200 and payload.get("success") is True:
+            status = payload.get("status")
+            if isinstance(status, dict):
+                process = status.get("process")
+                session = status.get("session")
+                running = isinstance(process, dict) and process.get("running") is process_running
+                if session_active is None:
+                    if running:
+                        return
+                elif isinstance(session, dict) and running and session.get("session_active") is session_active:
+                    return
+        time.sleep(0.5)
+
+    raise RuntimeError(f"Timed out waiting for session state: {last_payload}")
+
+
 def stop_session(base_url: str) -> tuple[int, dict[str, Any]]:
-    return call_json(
+    result = call_json(
         base_url,
         "/api/v1/session/stop",
         method="POST",
         payload={},
         timeout=30,
     )
+    wait_for_session_state(base_url, process_running=False, timeout=45)
+    return result
 
 
 def start_session(base_url: str) -> tuple[int, dict[str, Any]]:
-    return call_json(
+    result = call_json(
         base_url,
         "/api/v1/session/start",
         method="POST",
         payload={},
         timeout=120,
     )
+    if result[0] == 200 and result[1].get("success") is True:
+        wait_for_session_state(base_url, process_running=True, session_active=True, timeout=45)
+    return result
 
 
 def session_status(base_url: str) -> tuple[int, dict[str, Any]]:
@@ -121,6 +157,12 @@ def codesys_env() -> dict[str, str]:
     env["CODESYS_API_TRANSPORT"] = os.environ.get("CODESYS_E2E_TRANSPORT", "named_pipe")
     env["CODESYS_API_PIPE_NAME"] = "codesys_api_e2e_{0}".format(env["CODESYS_API_SERVER_PORT"])
     return env
+
+
+def assert_session_started(base_url: str) -> None:
+    status_code, payload = start_session(base_url)
+    assert status_code == 200
+    assert payload["success"] is True
 
 
 @pytest.fixture(scope="module")
@@ -158,7 +200,7 @@ def real_server() -> Generator[tuple[str, subprocess.Popen[str]], None, None]:
 def test_real_codesys_main_flow(real_server: tuple[str, subprocess.Popen[str]]) -> None:
     base_url, _process = real_server
     stop_session(base_url)
-    project_path = str(Path(tempfile.gettempdir()) / f"codesys_api_e2e_{int(time.time())}.project")
+    project_path = str(Path(tempfile.gettempdir()) / f"codesys_api_e2e_{uuid.uuid4().hex}.project")
 
     status_code, payload = start_session(base_url)
     assert status_code == 200
@@ -186,7 +228,7 @@ def test_real_codesys_main_flow(real_server: tuple[str, subprocess.Popen[str]]) 
 def test_real_codesys_restart_keeps_session_usable(real_server: tuple[str, subprocess.Popen[str]]) -> None:
     base_url, _process = real_server
     stop_session(base_url)
-    start_session(base_url)
+    assert_session_started(base_url)
 
     status_code, payload = call_json(
         base_url,
@@ -209,7 +251,7 @@ def test_real_codesys_restart_keeps_session_usable(real_server: tuple[str, subpr
 @pytest.mark.codesys_slow
 def test_real_codesys_stop_is_repeatable(real_server: tuple[str, subprocess.Popen[str]]) -> None:
     base_url, _process = real_server
-    start_session(base_url)
+    assert_session_started(base_url)
 
     first_status, first_payload = stop_session(base_url)
     second_status, second_payload = stop_session(base_url)
@@ -242,15 +284,15 @@ def test_real_codesys_compile_without_active_project_fails_cleanly(
 ) -> None:
     base_url, _process = real_server
     stop_session(base_url)
-    start_session(base_url)
-    project_path = str(Path(tempfile.gettempdir()) / f"codesys_api_compile_recovery_{int(time.time())}.project")
+    assert_session_started(base_url)
+    project_path = str(Path(tempfile.gettempdir()) / f"codesys_api_compile_recovery_{uuid.uuid4().hex}.project")
 
     status_code, payload = call_json(
         base_url,
         "/api/v1/project/compile",
         method="POST",
         payload={"clean_build": False},
-        timeout=180,
+        timeout=REAL_COMPILE_TIMEOUT,
     )
 
     assert status_code == 500
@@ -296,7 +338,7 @@ def test_real_codesys_compile_without_active_project_fails_cleanly(
         "/api/v1/project/compile",
         method="POST",
         payload={"clean_build": False},
-        timeout=180,
+        timeout=REAL_COMPILE_TIMEOUT,
     )
     assert status_code == 200
     assert payload["success"] is True

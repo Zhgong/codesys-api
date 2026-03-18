@@ -58,10 +58,16 @@ Completed so far:
   - `named_pipe` transport
   - host-side transport selection through config
   - CODESYS-side named-pipe listener in `PERSISTENT_SESSION.py`
+  - explicit transport error classification and metadata
+  - named-pipe listener readiness check in `CodesysProcessManager.start()`
 - Added real `pytest` CODESYS E2E under `tests/e2e/codesys`
 - Split real CODESYS acceptance into:
   - fast main track
   - slow runtime-hardening track
+- Tightened runtime recovery behavior:
+  - `stop_session()` and `start_session()` now wait for state convergence in real E2E
+  - fallback compile now saves and closes the project before restarting in UI mode
+  - real compile E2E uses a longer timeout for noUI fallback recovery
 
 ## Verification Status
 
@@ -70,12 +76,12 @@ These commands were green at the end of the session:
 ```powershell
 python -m pytest -q
 python -m mypy
-python -m py_compile HTTP_SERVER.py action_layer.py api_key_store.py codesys_process.py server_config.py file_ipc.py server_logic.py test_server.py ironpython_script_engine.py engine_adapter.py named_pipe_transport.py session_transport.py tests/e2e/codesys/test_real_codesys_e2e.py
+python -m py_compile HTTP_SERVER.py action_layer.py api_key_store.py codesys_process.py server_config.py file_ipc.py server_logic.py test_server.py ironpython_script_engine.py engine_adapter.py named_pipe_transport.py session_transport.py transport_result.py tests/e2e/codesys/test_real_codesys_e2e.py
 ```
 
 Expected results at handoff:
 
-- `pytest`: 76 tests passing, 5 skipped without real CODESYS env
+- `pytest`: 83 tests passing, 5 skipped without real CODESYS env
 - `pytest -m "codesys and not codesys_slow"`: default real acceptance entrypoint
 - `pytest -m codesys`: full real acceptance entrypoint
 - `mypy`: success with no issues
@@ -84,7 +90,8 @@ Verified real acceptance results:
 
 - Fast real acceptance passes with `CODESYS_E2E_TRANSPORT=file`
 - Fast real acceptance passes with `CODESYS_E2E_TRANSPORT=named_pipe`
-- Full slow real acceptance also passes with `CODESYS_E2E_TRANSPORT=named_pipe`
+- Full real acceptance passes with `CODESYS_E2E_TRANSPORT=file`
+- Full real acceptance passes with `CODESYS_E2E_TRANSPORT=named_pipe`
 
 ## Important Constraints
 
@@ -95,6 +102,8 @@ Verified real acceptance results:
 - Real CODESYS compile succeeds on this machine with `CODESYS_API_CODESYS_NO_UI=false`.
 - Real CODESYS compile also succeeds with `CODESYS_API_CODESYS_NO_UI=true` via automatic host-side fallback to UI mode for the compile path.
 - After a noUI compile fallback, the live session stays in UI mode until explicit `session/stop` or `session/restart`.
+- Named-pipe startup is not considered ready until the pipe listener is actually reachable.
+- The slowest noUI fallback compile path is long-running; real E2E currently uses a 300-second client timeout for that path.
 - Keep real E2E speedup separate from future transport tuning work.
 
 ## Next Best Steps

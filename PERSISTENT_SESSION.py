@@ -285,6 +285,7 @@ class CodesysPersistentSession(object):
     def process_named_pipe_requests(self):
         """Process script execution requests over a named pipe."""
         server = None
+        request_id = "unknown"
         try:
             server = NamedPipeServerStream(
                 PIPE_NAME,
@@ -316,11 +317,13 @@ class CodesysPersistentSession(object):
                         if server is not None and server.IsConnected:
                             self.write_named_pipe_result(server, {
                                 "success": False,
-                                "error": str(e)
+                                "error": str(e),
+                                "request_id": request_id,
                             })
                     except Exception, write_e:
                         self.log("Error writing named pipe failure response: " + str(write_e))
                 finally:
+                    request_id = "unknown"
                     try:
                         if server is not None and server.IsConnected:
                             server.Disconnect()

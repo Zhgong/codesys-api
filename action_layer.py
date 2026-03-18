@@ -392,6 +392,14 @@ class ActionService:
         if not save_result.get("success", False):
             return ActionResult(body=save_result, status_code=500, request_id=request.request_id)
 
+        close_result = self._execute_engine_action(
+            action=ActionType.PROJECT_CLOSE,
+            params={},
+            timeout_override=request.timeout,
+        )
+        if not close_result.get("success", False):
+            return ActionResult(body=close_result, status_code=500, request_id=request.request_id)
+
         if not self.process_manager.stop():
             return ActionResult(
                 body={"success": False, "error": "Failed to stop CODESYS session for noUI compile fallback"},

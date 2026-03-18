@@ -123,7 +123,13 @@ class ScriptExecutor:
             if result.get('success', False):
                 logger.info("Script execution successful")
             else:
-                logger.warning("Script execution failed: %s", result.get('error', 'Unknown error'))
+                logger.warning(
+                    "Script execution failed via transport=%s stage=%s retryable=%s: %s",
+                    result.get('transport', getattr(self.transport, 'transport_name', 'unknown')),
+                    result.get('error_stage', 'unknown'),
+                    result.get('retryable', 'n/a'),
+                    result.get('error', 'Unknown error'),
+                )
             return result
         except Exception as e:
             logger.error("Error executing script: %s", str(e))
@@ -519,6 +525,8 @@ def run_server():
             profile_name=APP_CONFIG.codesys_profile_name,
             profile_path=APP_CONFIG.codesys_profile_path,
             no_ui=APP_CONFIG.codesys_no_ui,
+            transport_name=APP_CONFIG.transport_name,
+            pipe_name=APP_CONFIG.pipe_name,
         )
         process_manager = CodesysProcessManager(process_config, logger=logger)
         transport = build_script_transport(

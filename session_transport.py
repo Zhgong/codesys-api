@@ -16,6 +16,7 @@ from file_ipc import (
     read_ipc_result,
 )
 from named_pipe_transport import NamedPipeScriptTransport
+from transport_result import attach_transport_metadata, build_transport_error
 
 __all__ = [
     "TransportRequest",
@@ -45,6 +46,8 @@ class TransportResult:
 
 
 class FileScriptTransport:
+    transport_name = "file"
+
     def __init__(
         self,
         *,
@@ -82,9 +85,17 @@ class FileScriptTransport:
             start_time = self.now_fn()
             while self.now_fn() - start_time < timeout:
                 if artifacts.result_path.exists():
-                    result = read_ipc_result(artifacts.result_path)
+                    try:
+                        result = read_ipc_result(artifacts.result_path)
+                    except Exception as exc:
+                        self._cleanup(script_path, result_path, request_path, request_work_dir)
+                        return build_transport_error(
+                            transport=self.transport_name,
+                            stage="result_read",
+                            error=str(exc),
+                        )
                     self._cleanup(script_path, result_path, request_path, request_work_dir)
-                    return result
+                    return attach_transport_metadata(result, transport=self.transport_name)
                 elapsed = self.now_fn() - start_time
                 self.sleep_fn(determine_poll_interval(elapsed))
 
@@ -95,10 +106,19 @@ class FileScriptTransport:
                     encoding="utf-8",
                 )
             self._cleanup(script_path, None, request_path, request_work_dir)
-            return build_timeout_result(elapsed)
+            return build_transport_error(
+                transport=self.transport_name,
+                stage="timeout",
+                error=str(build_timeout_result(elapsed)["error"]),
+                timeout=True,
+            )
         except Exception as exc:
             self._cleanup(script_path, result_path, request_path, request_work_dir)
-            return {"success": False, "error": str(exc)}
+            return build_transport_error(
+                transport=self.transport_name,
+                stage="request_create",
+                error=str(exc),
+            )
 
     def _cleanup(
         self,

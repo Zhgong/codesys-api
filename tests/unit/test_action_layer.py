@@ -362,6 +362,7 @@ def test_project_compile_restarts_in_ui_mode_when_no_ui_is_active() -> None:
         results=[
             {"success": True, "status": {"project": {"path": r"C:\repo\Demo.project"}}},
             {"success": True, "message": "saved"},
+            {"success": True, "message": "closed"},
             {"success": True, "message": "session started"},
             {"success": True, "project": {"path": r"C:\repo\Demo.project"}},
             {"success": True, "message": "compiled"},
@@ -393,6 +394,7 @@ def test_project_compile_restarts_in_ui_mode_when_no_ui_is_active() -> None:
     assert [call[0] for call in script_executor.calls] == [
         "status-script",
         "project-save",
+        "project-close",
         "start-script",
         r"project-open:C:\repo\Demo.project",
         "project-compile:False",
@@ -430,6 +432,7 @@ def test_project_compile_fallback_returns_error_when_stop_fails() -> None:
         results=[
             {"success": True, "status": {"project": {"path": r"C:\repo\Demo.project"}}},
             {"success": True, "message": "saved"},
+            {"success": True, "message": "closed"},
         ]
     )
     service = ActionService(
@@ -460,6 +463,7 @@ def test_project_compile_fallback_returns_error_when_restart_fails() -> None:
         results=[
             {"success": True, "status": {"project": {"path": r"C:\repo\Demo.project"}}},
             {"success": True, "message": "saved"},
+            {"success": True, "message": "closed"},
         ]
     )
     service = ActionService(
@@ -490,6 +494,7 @@ def test_project_compile_fallback_returns_engine_error_when_reopen_fails() -> No
         results=[
             {"success": True, "status": {"project": {"path": r"C:\repo\Demo.project"}}},
             {"success": True, "message": "saved"},
+            {"success": True, "message": "closed"},
             {"success": True, "message": "session started"},
             {"success": False, "error": "open failed"},
         ]
@@ -513,6 +518,38 @@ def test_project_compile_fallback_returns_engine_error_when_reopen_fails() -> No
         "success": False,
         "error": "open failed",
         "normalized_by": "project.open",
+    }
+
+
+def test_project_compile_fallback_returns_engine_error_when_close_fails() -> None:
+    process_manager = FakeProcessManager(running=True)
+    process_manager.no_ui_mode = True
+    script_executor = FakeScriptExecutor(
+        results=[
+            {"success": True, "status": {"project": {"path": r"C:\repo\Demo.project"}}},
+            {"success": True, "message": "saved"},
+            {"success": False, "error": "close failed"},
+        ]
+    )
+    service = ActionService(
+        process_manager=process_manager,
+        script_executor=script_executor,
+        engine_adapter=FakeEngineAdapter(),
+        logger=logging.getLogger("action-layer-test"),
+        now_fn=lambda: 999.0,
+        script_dir=Path(r"C:\repo"),
+        sleep_fn=lambda _seconds: None,
+    )
+
+    result = service.execute(
+        ActionRequest(action=ActionType.PROJECT_COMPILE, params={"clean_build": False})
+    )
+
+    assert result.status_code == 500
+    assert result.body == {
+        "success": False,
+        "error": "close failed",
+        "normalized_by": "project.close",
     }
 
 

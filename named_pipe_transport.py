@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Final
 
 from file_ipc import build_timeout_result
+from transport_result import attach_transport_metadata, build_transport_error
 
 
 INVALID_HANDLE_VALUE: Final[int] = -1
@@ -92,11 +93,35 @@ kernel32.FlushFileBuffers.restype = ctypes.c_int
 class NamedPipeConfig:
     pipe_name: str
     connect_poll_interval: float = 0.1
-    max_write_retries: int = 2
+    write_retry_delay: float = 0.5
+    max_write_retries: int = 8
 
 
 def build_pipe_path(pipe_name: str) -> str:
     return r"\\.\pipe\{0}".format(pipe_name)
+
+
+def wait_for_named_pipe_listener(
+    pipe_name: str,
+    timeout_seconds: float,
+    *,
+    now_fn: Callable[[], float] = time.time,
+    sleep_fn: Callable[[float], None] = time.sleep,
+    poll_interval: float = 0.1,
+) -> bool:
+    pipe_path = build_pipe_path(pipe_name)
+    deadline = now_fn() + timeout_seconds
+
+    while now_fn() < deadline:
+        remaining_ms = max(1, min(int((deadline - now_fn()) * 1000), 250))
+        if kernel32.WaitNamedPipeW(pipe_path, remaining_ms):
+            return True
+        error_code = ctypes.get_last_error()
+        if error_code not in (ERROR_SEM_TIMEOUT, ERROR_FILE_NOT_FOUND):
+            raise OSError(error_code, "WaitNamedPipeW failed while waiting for listener")
+        sleep_fn(poll_interval)
+
+    return False
 
 
 def encode_pipe_message(payload: Mapping[str, object]) -> bytes:
@@ -190,6 +215,8 @@ def write_pipe_payload(handle: ctypes.c_void_p, payload: Mapping[str, object]) -
 
 
 class NamedPipeScriptTransport:
+    transport_name = "named_pipe"
+
     def __init__(
         self,
         *,
@@ -220,9 +247,19 @@ class NamedPipeScriptTransport:
             try:
                 handle = self._connect(max(1, int(remaining)))
             except TimeoutError:
-                return build_timeout_result(float(timeout))
+                return build_transport_error(
+                    transport=self.transport_name,
+                    stage="timeout",
+                    error=str(build_timeout_result(float(timeout))["error"]),
+                    timeout=True,
+                )
             except OSError as exc:
-                return {"success": False, "error": "Named pipe connection failed: {0}".format(exc)}
+                return build_transport_error(
+                    transport=self.transport_name,
+                    stage="connect",
+                    error="Named pipe connection failed: {0}".format(exc),
+                    retryable=False,
+                )
 
             try:
                 write_pipe_payload(handle, payload)
@@ -230,28 +267,45 @@ class NamedPipeScriptTransport:
             except OSError as exc:
                 if self._should_retry_write(exc) and attempts < self.config.max_write_retries:
                     attempts += 1
-                    self.sleep_fn(self.config.connect_poll_interval)
+                    self.sleep_fn(self.config.write_retry_delay)
                     close_pipe_handle(handle)
                     continue
                 close_pipe_handle(handle)
-                return {"success": False, "error": "Named pipe transport failed: {0}".format(exc)}
+                return build_transport_error(
+                    transport=self.transport_name,
+                    stage=self._error_stage_for_os_error(exc),
+                    error="Named pipe transport failed: {0}".format(exc),
+                    retryable=self._should_retry_write(exc),
+                )
             except TimeoutError:
                 close_pipe_handle(handle)
-                return build_timeout_result(float(timeout))
+                return build_transport_error(
+                    transport=self.transport_name,
+                    stage="timeout",
+                    error=str(build_timeout_result(float(timeout))["error"]),
+                    timeout=True,
+                )
             except (EOFError, ValueError, json.JSONDecodeError) as exc:
                 close_pipe_handle(handle)
-                return {"success": False, "error": "Named pipe transport failed: {0}".format(exc)}
+                return build_transport_error(
+                    transport=self.transport_name,
+                    stage="decode",
+                    error="Named pipe transport failed: {0}".format(exc),
+                    retryable=False,
+                )
 
             close_pipe_handle(handle)
 
             response_id = result.get("request_id")
             if response_id != request_id:
-                return {
-                    "success": False,
-                    "error": "Named pipe response request_id mismatch",
-                }
+                return build_transport_error(
+                    transport=self.transport_name,
+                    stage="response_mismatch",
+                    error="Named pipe response request_id mismatch",
+                    retryable=False,
+                )
 
-            return result
+            return attach_transport_metadata(result, transport=self.transport_name)
 
     def _connect(self, timeout: int) -> ctypes.c_void_p:
         pipe_path = build_pipe_path(self.config.pipe_name)
@@ -290,3 +344,8 @@ class NamedPipeScriptTransport:
 
     def _should_retry_write(self, exc: OSError) -> bool:
         return exc.errno in (ERROR_INVALID_HANDLE, ERROR_BROKEN_PIPE)
+
+    def _error_stage_for_os_error(self, exc: OSError) -> str:
+        if exc.errno in (ERROR_INVALID_HANDLE, ERROR_BROKEN_PIPE):
+            return "write"
+        return "read"
