@@ -16,6 +16,7 @@ warn_unused_configs = true
 files = [
     "action_layer.py",
     "api_key_store.py",
+    "codesys_e2e_policy.py",
     "codesys_process.py",
     "engine_adapter.py",
     "file_ipc.py",

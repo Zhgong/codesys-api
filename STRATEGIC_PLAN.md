@@ -25,8 +25,9 @@ The long-term architecture should be organized into five layers:
    - Becomes the only layer that knows about engine-specific syntax, APIs, and capability differences
 
 4. Transport layer
-   - Current implementation: file-based IPC
-   - Future implementation: a more explicit local IPC transport
+   - Current standard implementation: named-pipe local IPC
+   - Current legacy fallback: file-based IPC
+   - Future direction: reduce reliance on the file-based fallback and eventually retire it once named-pipe stability is sufficient
    - The action model must remain stable even if the transport changes
 
 5. CODESYS session execution layer
@@ -57,6 +58,12 @@ The current weaknesses are primarily:
 - Limited automated regression coverage for safe migration
 - Internal execution behavior coupled tightly to the current HTTP layer
 - IronPython and `scriptengine` assumptions embedded directly in the execution path
+
+The current transport stance is:
+
+- `named_pipe` is the recommended primary transport
+- `file` remains available only as a legacy fallback and compatibility baseline
+- file-transport retirement should happen only after explicit readiness criteria are met
 
 ## Execution Strategy
 
@@ -242,8 +249,9 @@ The key principle is to avoid changing transport, public interface, engine imple
 
 ### Core Tasks
 
-- Keep file-based IPC as the starting point
-- Replace the current transport only after the action model and regression suite are stable
+- Keep the existing file-based fallback until named-pipe stability is proven over time
+- Continue treating named-pipe as the standard path
+- Replace or retire the file-based fallback only after the action model and regression suite are stable and the removal criteria are met
 - Ensure transport replacement does not change the public REST contract
 - Validate equivalent behavior before and after transport changes
 

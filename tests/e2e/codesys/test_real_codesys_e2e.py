@@ -15,6 +15,12 @@ from urllib import error, request
 
 import pytest
 
+from codesys_e2e_policy import (
+    LEGACY_TRANSPORT,
+    current_codesys_e2e_transport,
+    legacy_file_full_track_enabled,
+)
+
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 REAL_COMPILE_TIMEOUT = 300
@@ -137,6 +143,14 @@ def session_status(base_url: str) -> tuple[int, dict[str, Any]]:
     )
 
 
+def skip_if_legacy_file_full_track_not_enabled() -> None:
+    if current_codesys_e2e_transport(os.environ) == LEGACY_TRANSPORT and not legacy_file_full_track_enabled(os.environ):
+        pytest.skip(
+            "Legacy file transport only runs fast-track E2E by default; "
+            "set CODESYS_E2E_FILE_FULL=1 to run slow-track checks"
+        )
+
+
 def codesys_env() -> dict[str, str]:
     if os.environ.get("CODESYS_E2E_ENABLE") != "1":
         pytest.skip("Set CODESYS_E2E_ENABLE=1 to run real CODESYS E2E tests")
@@ -154,7 +168,7 @@ def codesys_env() -> dict[str, str]:
     env["CODESYS_API_SERVER_HOST"] = "127.0.0.1"
     env["CODESYS_API_SERVER_PORT"] = str(find_free_port())
     env["CODESYS_API_CODESYS_NO_UI"] = os.environ.get("CODESYS_E2E_NO_UI", "false")
-    env["CODESYS_API_TRANSPORT"] = os.environ.get("CODESYS_E2E_TRANSPORT", "named_pipe")
+    env["CODESYS_API_TRANSPORT"] = current_codesys_e2e_transport(os.environ)
     env["CODESYS_API_PIPE_NAME"] = "codesys_api_e2e_{0}".format(env["CODESYS_API_SERVER_PORT"])
     return env
 
@@ -226,6 +240,7 @@ def test_real_codesys_main_flow(real_server: tuple[str, subprocess.Popen[str]]) 
 @pytest.mark.codesys
 @pytest.mark.codesys_slow
 def test_real_codesys_restart_keeps_session_usable(real_server: tuple[str, subprocess.Popen[str]]) -> None:
+    skip_if_legacy_file_full_track_not_enabled()
     base_url, _process = real_server
     stop_session(base_url)
     assert_session_started(base_url)
@@ -250,6 +265,7 @@ def test_real_codesys_restart_keeps_session_usable(real_server: tuple[str, subpr
 @pytest.mark.codesys
 @pytest.mark.codesys_slow
 def test_real_codesys_stop_is_repeatable(real_server: tuple[str, subprocess.Popen[str]]) -> None:
+    skip_if_legacy_file_full_track_not_enabled()
     base_url, _process = real_server
     assert_session_started(base_url)
 
@@ -265,6 +281,7 @@ def test_real_codesys_stop_is_repeatable(real_server: tuple[str, subprocess.Pope
 @pytest.mark.codesys
 @pytest.mark.codesys_slow
 def test_real_codesys_start_is_repeatable(real_server: tuple[str, subprocess.Popen[str]]) -> None:
+    skip_if_legacy_file_full_track_not_enabled()
     base_url, _process = real_server
     stop_session(base_url)
 
@@ -282,6 +299,7 @@ def test_real_codesys_start_is_repeatable(real_server: tuple[str, subprocess.Pop
 def test_real_codesys_compile_without_active_project_fails_cleanly(
     real_server: tuple[str, subprocess.Popen[str]],
 ) -> None:
+    skip_if_legacy_file_full_track_not_enabled()
     base_url, _process = real_server
     stop_session(base_url)
     assert_session_started(base_url)

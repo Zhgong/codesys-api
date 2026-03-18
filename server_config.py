@@ -10,6 +10,7 @@ DEFAULT_SERVER_PORT = 8080
 DEFAULT_CODESYS_PATH = Path(r"C:\Program Files\CODESYS 3.5.21.0\CODESYS\Common\CODESYS.exe")
 DEFAULT_TRANSPORT = "named_pipe"
 DEFAULT_PIPE_NAME = "codesys_api_session"
+LEGACY_TRANSPORTS = frozenset({"file"})
 
 
 @dataclass(frozen=True)
@@ -31,6 +32,20 @@ class ServerConfig:
     status_file: Path
     log_file: Path
     script_lib_dir: Path
+
+    @property
+    def transport_is_legacy(self) -> bool:
+        return self.transport_name in LEGACY_TRANSPORTS
+
+    @property
+    def transport_role(self) -> str:
+        if self.transport_is_legacy:
+            return "legacy_fallback"
+        return "primary"
+
+    @property
+    def recommended_transport(self) -> str:
+        return DEFAULT_TRANSPORT
 
 
 def _profile_name_from_path(profile_path: Path) -> str:

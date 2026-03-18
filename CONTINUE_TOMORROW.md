@@ -3,7 +3,7 @@
 ## Current State
 
 The host-side refactor, engine adapter landing, runtime hardening, and transport
-dual-stack work are now far enough along to support both fast and full real
+primary-path work are now far enough along to support both fast and full real
 CODESYS acceptance.
 
 Completed so far:
@@ -53,9 +53,9 @@ Completed so far:
   - reopen project
   - compile automatically without manual intervention
 - Added runtime-mode reset after explicit `session/stop` and `session/restart`
-- Added transport dual-stack support:
-  - `file` transport
-  - `named_pipe` transport
+- Added transport support with a primary and fallback path:
+  - `named_pipe` primary transport
+  - `file` legacy fallback transport
   - host-side transport selection through config
   - CODESYS-side named-pipe listener in `PERSISTENT_SESSION.py`
   - explicit transport error classification and metadata
@@ -71,6 +71,8 @@ Completed so far:
   - named-pipe exchange/retry logic moved behind a private helper
   - CODESYS-side named-pipe request validation and response normalization helpers in `PERSISTENT_SESSION.py`
   - contract tests for the named-pipe request/response envelope in `PERSISTENT_SESSION.py`
+  - marked `file` as a legacy fallback transport in config and `system/info`
+  - kept `named_pipe` as the only recommended transport
 - Added real `pytest` CODESYS E2E under `tests/e2e/codesys`
 - Split real CODESYS acceptance into:
   - fast main track
@@ -99,10 +101,10 @@ Expected results at handoff:
 
 Verified real acceptance results:
 
-- Fast real acceptance passes with `CODESYS_E2E_TRANSPORT=file`
 - Fast real acceptance passes with `CODESYS_E2E_TRANSPORT=named_pipe`
-- Full real acceptance passes with `CODESYS_E2E_TRANSPORT=file`
 - Full real acceptance passes with `CODESYS_E2E_TRANSPORT=named_pipe`
+- Legacy fallback baseline still passes with `CODESYS_E2E_TRANSPORT=file`
+- Legacy `file` slow-track real E2E is now opt-in via `CODESYS_E2E_FILE_FULL=1`
 
 ## Important Constraints
 
@@ -116,13 +118,17 @@ Verified real acceptance results:
 - Named-pipe startup is not considered ready until the pipe listener is actually reachable.
 - The slowest noUI fallback compile path is long-running; real E2E currently uses a 300-second client timeout for that path.
 - Keep real E2E speedup separate from future transport tuning work.
+- `file` is no longer the peer default path; it is a manual legacy fallback for compatibility and transport debugging.
+- Slow-track real E2E now defaults to `named_pipe`; `file` only runs fast-track unless `CODESYS_E2E_FILE_FULL=1`.
+- The current `file` removal criteria live in `FILE_TRANSPORT_RETIREMENT.md`.
 
 ## Next Best Steps
 
-1. Continue transport evolution, now that both fast and full real acceptance pass with `named_pipe`.
-2. Focus on transport diagnostics, edge-case recovery, and simplifying the remaining dual-stack behavior.
-3. Keep the real CODESYS E2E as the phase-boundary runtime acceptance test, not just a happy-path smoke.
-4. Do not reopen the `--noUI` compile issue unless new regressions appear.
+1. Continue transport evolution with `named_pipe` as the standard path.
+2. Keep `file` only as a minimal compatibility baseline while measuring against `FILE_TRANSPORT_RETIREMENT.md`.
+3. Focus on transport diagnostics, edge-case recovery, and evidence that `file` can later become a removal candidate.
+4. Keep the real CODESYS E2E as the phase-boundary runtime acceptance test, not just a happy-path smoke.
+5. Do not reopen the `--noUI` compile issue unless new regressions appear.
 
 ## Recommended Sequence For Next Session
 
@@ -133,14 +139,16 @@ Reason:
 - The host-side seams and engine adapter seam are active
 - The real happy path is already verified end-to-end
 - The slow runtime-hardening track is now also verified with `named_pipe`
+- `named_pipe` is now the only recommended transport path
 - CLI is still lower priority than transport reliability
 
 ## Quick Resume Checklist
 
 1. Open `STRATEGIC_PLAN.md`
 2. Open `COLLABORATION_TEMPLATE.md`
-3. Open this file
-4. Run:
+3. Open `FILE_TRANSPORT_RETIREMENT.md`
+4. Open this file
+5. Run:
 
 ```powershell
 python -m pytest -q
@@ -148,7 +156,7 @@ python -m mypy
 git status --short
 ```
 
-5. If running real CODESYS fast acceptance:
+6. If running real CODESYS fast acceptance:
 
 ```powershell
 $env:CODESYS_E2E_ENABLE="1"
@@ -160,7 +168,7 @@ $env:CODESYS_E2E_TRANSPORT="named_pipe"
 python -m pytest -q -m "codesys and not codesys_slow" tests/e2e/codesys
 ```
 
-6. If running full real CODESYS acceptance:
+7. If running full real CODESYS acceptance:
 
 ```powershell
 $env:CODESYS_E2E_ENABLE="1"
@@ -169,5 +177,30 @@ $env:CODESYS_API_CODESYS_PROFILE="..."
 $env:CODESYS_API_CODESYS_PROFILE_PATH="..."
 $env:CODESYS_E2E_NO_UI="true"
 $env:CODESYS_E2E_TRANSPORT="named_pipe"
+python -m pytest -q -m codesys tests/e2e/codesys
+```
+
+8. If checking the legacy fallback transport only:
+
+```powershell
+$env:CODESYS_E2E_ENABLE="1"
+$env:CODESYS_API_CODESYS_PATH="..."
+$env:CODESYS_API_CODESYS_PROFILE="..."
+$env:CODESYS_API_CODESYS_PROFILE_PATH="..."
+$env:CODESYS_E2E_NO_UI="true"
+$env:CODESYS_E2E_TRANSPORT="file"
+python -m pytest -q -m "codesys and not codesys_slow" tests/e2e/codesys
+```
+
+9. If you explicitly need the legacy `file` slow track:
+
+```powershell
+$env:CODESYS_E2E_ENABLE="1"
+$env:CODESYS_API_CODESYS_PATH="..."
+$env:CODESYS_API_CODESYS_PROFILE="..."
+$env:CODESYS_API_CODESYS_PROFILE_PATH="..."
+$env:CODESYS_E2E_NO_UI="true"
+$env:CODESYS_E2E_TRANSPORT="file"
+$env:CODESYS_E2E_FILE_FULL="1"
 python -m pytest -q -m codesys tests/e2e/codesys
 ```

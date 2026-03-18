@@ -74,6 +74,23 @@ LOG_FILE = str(APP_CONFIG.log_file)
 TRANSPORT_NAME = APP_CONFIG.transport_name
 PIPE_NAME = APP_CONFIG.pipe_name
 
+
+def build_system_info(process_manager: Any) -> dict[str, object]:
+    """Build the system/info payload."""
+    return {
+        "version": "0.1",
+        "process_manager": {
+            "status": process_manager.is_running()
+        },
+        "codesys_path": CODESYS_PATH,
+        "persistent_script": PERSISTENT_SCRIPT,
+        "transport": TRANSPORT_NAME,
+        "transport_role": APP_CONFIG.transport_role,
+        "transport_legacy": APP_CONFIG.transport_is_legacy,
+        "recommended_transport": APP_CONFIG.recommended_transport,
+        "pipe_name": PIPE_NAME,
+    }
+
 # Ensure directories exist with proper permissions
 def ensure_directory(path):
     """Ensure directory exists with proper permissions."""
@@ -478,20 +495,9 @@ class CodesysApiHandler(BaseHTTPRequestHandler):
         
     def handle_system_info(self):
         """Handle system/info endpoint."""
-        info = {
-            "version": "0.1",
-            "process_manager": {
-                "status": self.process_manager.is_running()
-            },
-            "codesys_path": CODESYS_PATH,
-            "persistent_script": PERSISTENT_SCRIPT,
-            "transport": TRANSPORT_NAME,
-            "pipe_name": PIPE_NAME,
-        }
-        
         self.send_json_response({
             "success": True,
-            "info": info
+            "info": build_system_info(self.process_manager)
         })
         
     def handle_system_logs(self):
@@ -566,6 +572,12 @@ def run_server():
         
         print("Starting server on {0}:{1}".format(SERVER_HOST, SERVER_PORT))
         logger.info("Starting server on %s:%d", SERVER_HOST, SERVER_PORT)
+        if APP_CONFIG.transport_is_legacy:
+            logger.warning(
+                "Using legacy fallback transport: %s (recommended: %s)",
+                APP_CONFIG.transport_name,
+                APP_CONFIG.recommended_transport,
+            )
         
         # Run server
         server.serve_forever()
