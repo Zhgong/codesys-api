@@ -14,15 +14,16 @@ from file_ipc import (
 )
 from named_pipe_transport import NamedPipeScriptTransport
 from transport_result import (
+    TransportExecutionContext,
     TransportRequest,
-    build_timeout_transport_error,
     build_transport_error,
-    create_transport_request,
+    create_transport_execution,
     normalize_transport_result,
 )
 
 __all__ = [
     "TransportRequest",
+    "TransportExecutionContext",
     "FileScriptTransport",
     "NamedPipeScriptTransport",
     "build_script_transport",
@@ -52,11 +53,12 @@ class FileScriptTransport:
         self.sleep_fn = sleep_fn
 
     def execute_script(self, script_content: str, timeout: int = 60) -> dict[str, object]:
-        transport_request = create_transport_request(
+        execution = create_transport_execution(
             script=script_content,
             timeout_hint=timeout,
             now_fn=self.now_fn,
         )
+        transport_request = execution.request
         script_path: str | None = None
         result_path: str | None = None
         request_path: str | None = None
@@ -74,8 +76,7 @@ class FileScriptTransport:
             result_path = str(artifacts.result_path)
             request_path = str(artifacts.request_path)
 
-            start_time = self.now_fn()
-            while self.now_fn() - start_time < timeout:
+            while not execution.timed_out(self.now_fn):
                 if artifacts.result_path.exists():
                     try:
                         result = read_ipc_result(artifacts.result_path)
@@ -93,25 +94,16 @@ class FileScriptTransport:
                         transport=self.transport_name,
                         request_id=transport_request.request_id,
                     )
-                elapsed = self.now_fn() - start_time
+                elapsed = execution.elapsed_seconds(self.now_fn)
                 self.sleep_fn(determine_poll_interval(elapsed))
 
-            elapsed = self.now_fn() - start_time
             if artifacts.result_path.parent.exists():
                 artifacts.result_path.write_text(
-                    json.dumps(build_timeout_transport_error(
-                        transport=self.transport_name,
-                        elapsed_seconds=elapsed,
-                        request_id=transport_request.request_id,
-                    )),
+                    json.dumps(execution.build_timeout_error(self.transport_name, now_fn=self.now_fn)),
                     encoding="utf-8",
                 )
             self._cleanup(script_path, None, request_path, request_work_dir)
-            return build_timeout_transport_error(
-                transport=self.transport_name,
-                elapsed_seconds=elapsed,
-                request_id=transport_request.request_id,
-            )
+            return execution.build_timeout_error(self.transport_name, now_fn=self.now_fn)
         except Exception as exc:
             self._cleanup(script_path, result_path, request_path, request_work_dir)
             return build_transport_error(

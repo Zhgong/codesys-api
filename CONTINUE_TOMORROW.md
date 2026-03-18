@@ -65,6 +65,7 @@ Completed so far:
   - explicit `build_script_transport()` contract coverage for `file`, `named_pipe`, and unsupported transports
   - normalized transport result shape so success and error paths consistently carry `transport` and `request_id`
   - shared success-result normalization helper in `transport_result.py`
+  - shared transport execution context for request/deadline/timeout handling
 - Added real `pytest` CODESYS E2E under `tests/e2e/codesys`
 - Split real CODESYS acceptance into:
   - fast main track
@@ -86,7 +87,7 @@ python -m py_compile HTTP_SERVER.py action_layer.py api_key_store.py codesys_pro
 
 Expected results at handoff:
 
-- `pytest`: 92 tests passing, 5 skipped without real CODESYS env
+- `pytest`: 95 tests passing, 5 skipped without real CODESYS env
 - `pytest -m "codesys and not codesys_slow"`: default real acceptance entrypoint
 - `pytest -m codesys`: full real acceptance entrypoint
 - `mypy`: success with no issues

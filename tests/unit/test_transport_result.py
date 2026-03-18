@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from transport_result import (
+    TransportExecutionContext,
     TransportRequest,
+    create_transport_execution,
     attach_transport_metadata,
     build_timeout_transport_error,
     build_transport_error,
@@ -30,6 +32,26 @@ def test_create_transport_request_builds_stable_envelope() -> None:
         "timeout_hint": 12,
         "created_at": 123.5,
     }
+
+
+def test_create_transport_execution_builds_shared_request_and_deadline() -> None:
+    execution = create_transport_execution(
+        script="print('hello')",
+        timeout_hint=12,
+        now_fn=lambda: 123.5,
+        request_id_factory=lambda: "req-123",
+    )
+
+    assert execution == TransportExecutionContext(
+        request=TransportRequest(
+            request_id="req-123",
+            script="print('hello')",
+            timeout_hint=12,
+            created_at=123.5,
+        ),
+        started_at=123.5,
+        deadline=135.5,
+    )
 
 
 def test_build_timeout_transport_error_includes_transport_metadata() -> None:
@@ -80,3 +102,31 @@ def test_normalize_transport_result_preserves_existing_request_id() -> None:
 
     assert result["transport"] == "named_pipe"
     assert result["request_id"] == "engine-req"
+
+
+def test_transport_execution_context_builds_timeout_error() -> None:
+    execution = create_transport_execution(
+        script="print('hello')",
+        timeout_hint=12,
+        now_fn=lambda: 100.0,
+        request_id_factory=lambda: "req-123",
+    )
+
+    result = execution.build_timeout_error("file", now_fn=lambda: 112.5)
+
+    assert result["success"] is False
+    assert result["transport"] == "file"
+    assert result["request_id"] == "req-123"
+    assert result["error_stage"] == "timeout"
+
+
+def test_transport_execution_context_reports_remaining_seconds() -> None:
+    execution = create_transport_execution(
+        script="print('hello')",
+        timeout_hint=12,
+        now_fn=lambda: 100.0,
+        request_id_factory=lambda: "req-123",
+    )
+
+    assert execution.remaining_seconds(lambda: 104.5) == 7.5
+    assert execution.remaining_seconds(lambda: 120.0) == 0.0

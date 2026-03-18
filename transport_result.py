@@ -29,6 +29,34 @@ class TransportRequest:
         }
 
 
+@dataclass(frozen=True)
+class TransportExecutionContext:
+    request: TransportRequest
+    started_at: float
+    deadline: float
+
+    def elapsed_seconds(self, now_fn: NowFn = time.time) -> float:
+        return max(0.0, float(now_fn()) - self.started_at)
+
+    def remaining_seconds(self, now_fn: NowFn = time.time) -> float:
+        return max(0.0, self.deadline - float(now_fn()))
+
+    def timed_out(self, now_fn: NowFn = time.time) -> bool:
+        return self.remaining_seconds(now_fn) <= 0.0
+
+    def build_timeout_error(
+        self,
+        transport: str,
+        *,
+        now_fn: NowFn = time.time,
+    ) -> dict[str, Any]:
+        return build_timeout_transport_error(
+            transport=transport,
+            elapsed_seconds=self.elapsed_seconds(now_fn),
+            request_id=self.request.request_id,
+        )
+
+
 def create_transport_request(
     *,
     script: str,
@@ -43,6 +71,29 @@ def create_transport_request(
         script=script,
         timeout_hint=timeout_hint,
         created_at=float(now_fn()),
+    )
+
+
+def create_transport_execution(
+    *,
+    script: str,
+    timeout_hint: int,
+    now_fn: NowFn = time.time,
+    request_id_factory: RequestIdFactory | None = None,
+) -> TransportExecutionContext:
+    started_at = float(now_fn())
+    if request_id_factory is None:
+        request_id_factory = lambda: str(uuid.uuid4())
+    request = TransportRequest(
+        request_id=str(request_id_factory()),
+        script=script,
+        timeout_hint=timeout_hint,
+        created_at=started_at,
+    )
+    return TransportExecutionContext(
+        request=request,
+        started_at=started_at,
+        deadline=started_at + timeout_hint,
     )
 
 

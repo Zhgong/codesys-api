@@ -9,9 +9,9 @@ from dataclasses import dataclass
 from typing import Any, Callable, Final
 
 from transport_result import (
-    build_timeout_transport_error,
+    TransportExecutionContext,
     build_transport_error,
-    create_transport_request,
+    create_transport_execution,
     normalize_transport_result,
 )
 
@@ -232,32 +232,24 @@ class NamedPipeScriptTransport:
         self.sleep_fn = sleep_fn
 
     def execute_script(self, script_content: str, timeout: int = 60) -> dict[str, object]:
-        transport_request = create_transport_request(
+        execution = create_transport_execution(
             script=script_content,
             timeout_hint=timeout,
             now_fn=self.now_fn,
         )
+        transport_request = execution.request
         payload = transport_request.as_payload()
-        deadline = self.now_fn() + timeout
         attempts = 0
 
         while True:
-            remaining = deadline - self.now_fn()
+            remaining = execution.remaining_seconds(self.now_fn)
             if remaining <= 0:
-                return build_timeout_transport_error(
-                    transport=self.transport_name,
-                    elapsed_seconds=float(timeout),
-                    request_id=transport_request.request_id,
-                )
+                return execution.build_timeout_error(self.transport_name, now_fn=self.now_fn)
 
             try:
                 handle = self._connect(max(1, int(remaining)))
             except TimeoutError:
-                return build_timeout_transport_error(
-                    transport=self.transport_name,
-                    elapsed_seconds=float(timeout),
-                    request_id=transport_request.request_id,
-                )
+                return execution.build_timeout_error(self.transport_name, now_fn=self.now_fn)
             except OSError as exc:
                 return build_transport_error(
                     transport=self.transport_name,
@@ -286,11 +278,7 @@ class NamedPipeScriptTransport:
                 )
             except TimeoutError:
                 close_pipe_handle(handle)
-                return build_timeout_transport_error(
-                    transport=self.transport_name,
-                    elapsed_seconds=float(timeout),
-                    request_id=transport_request.request_id,
-                )
+                return execution.build_timeout_error(self.transport_name, now_fn=self.now_fn)
             except (EOFError, ValueError, json.JSONDecodeError) as exc:
                 close_pipe_handle(handle)
                 return build_transport_error(
