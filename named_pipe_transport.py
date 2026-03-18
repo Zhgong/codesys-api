@@ -30,6 +30,10 @@ ERROR_BROKEN_PIPE: Final[int] = 109
 ERROR_SEM_TIMEOUT: Final[int] = 121
 
 
+class NamedPipeConnectError(OSError):
+    """Raised when the named-pipe connection step fails before any I/O."""
+
+
 kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
 
 
@@ -237,54 +241,19 @@ class NamedPipeScriptTransport:
         )
         transport_request = execution.request
         payload = transport_request.as_payload()
-        attempts = 0
 
         while True:
-            remaining = execution.remaining_seconds(self.now_fn)
-            if remaining <= 0:
-                return execution.build_timeout_error(self.transport_name, now_fn=self.now_fn)
-
             try:
-                handle = self._connect(max(1, int(remaining)))
+                result = self._exchange_payload(execution, payload)
             except TimeoutError:
                 return execution.build_timeout_error(self.transport_name, now_fn=self.now_fn)
             except OSError as exc:
                 return execution.build_error(
                     self.transport_name,
-                    stage="connect",
-                    error="Named pipe connection failed: {0}".format(exc),
-                    retryable=False,
-                )
-
-            try:
-                write_pipe_payload(handle, payload)
-                result = read_pipe_payload(handle)
-            except OSError as exc:
-                if self._should_retry_write(exc) and attempts < self.config.max_write_retries:
-                    attempts += 1
-                    self.sleep_fn(self.config.write_retry_delay)
-                    close_pipe_handle(handle)
-                    continue
-                close_pipe_handle(handle)
-                return execution.build_error(
-                    self.transport_name,
-                    stage=self._error_stage_for_os_error(exc),
+                    stage=self._error_stage_for_transport_exception(exc),
                     error="Named pipe transport failed: {0}".format(exc),
-                    retryable=self._should_retry_write(exc),
+                    retryable=self._is_retryable_transport_exception(exc),
                 )
-            except TimeoutError:
-                close_pipe_handle(handle)
-                return execution.build_timeout_error(self.transport_name, now_fn=self.now_fn)
-            except (EOFError, ValueError, json.JSONDecodeError) as exc:
-                close_pipe_handle(handle)
-                return execution.build_error(
-                    self.transport_name,
-                    stage="decode",
-                    error="Named pipe transport failed: {0}".format(exc),
-                    retryable=False,
-                )
-
-            close_pipe_handle(handle)
 
             response_id = result.get("request_id")
             if response_id != transport_request.request_id:
@@ -299,6 +268,34 @@ class NamedPipeScriptTransport:
                 result,
                 self.transport_name,
             )
+
+    def _exchange_payload(
+        self,
+        execution: TransportExecutionContext,
+        payload: Mapping[str, object],
+    ) -> dict[str, object]:
+        attempts = 0
+
+        while True:
+            remaining = execution.remaining_seconds(self.now_fn)
+            if remaining <= 0:
+                raise TimeoutError("Timed out exchanging named pipe payload")
+
+            try:
+                handle = self._connect(max(1, int(remaining)))
+            except OSError as exc:
+                raise NamedPipeConnectError(exc.errno, str(exc)) from exc
+            try:
+                write_pipe_payload(handle, payload)
+                return read_pipe_payload(handle)
+            except OSError as exc:
+                if self._should_retry_write(exc) and attempts < self.config.max_write_retries:
+                    attempts += 1
+                    self.sleep_fn(self.config.write_retry_delay)
+                    continue
+                raise
+            finally:
+                close_pipe_handle(handle)
 
     def _connect(self, timeout: int) -> ctypes.c_void_p:
         pipe_path = build_pipe_path(self.config.pipe_name)
@@ -337,6 +334,20 @@ class NamedPipeScriptTransport:
 
     def _should_retry_write(self, exc: OSError) -> bool:
         return exc.errno in (ERROR_INVALID_HANDLE, ERROR_BROKEN_PIPE)
+
+    def _is_retryable_transport_exception(self, exc: Exception) -> bool | None:
+        if isinstance(exc, OSError):
+            return self._should_retry_write(exc)
+        return False
+
+    def _error_stage_for_transport_exception(self, exc: Exception) -> str:
+        if isinstance(exc, NamedPipeConnectError):
+            return "connect"
+        if isinstance(exc, (EOFError, ValueError, json.JSONDecodeError)):
+            return "decode"
+        if isinstance(exc, OSError):
+            return self._error_stage_for_os_error(exc)
+        return "read"
 
     def _error_stage_for_os_error(self, exc: OSError) -> str:
         if exc.errno in (ERROR_INVALID_HANDLE, ERROR_BROKEN_PIPE):

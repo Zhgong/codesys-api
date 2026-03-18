@@ -74,24 +74,24 @@ class FileScriptTransport:
             result_path = str(artifacts.result_path)
             request_path = str(artifacts.request_path)
 
-            while not execution.timed_out(self.now_fn):
-                if artifacts.result_path.exists():
-                    try:
-                        result = read_ipc_result(artifacts.result_path)
-                    except Exception as exc:
-                        self._cleanup(script_path, result_path, request_path, request_work_dir)
-                        return execution.build_error(
-                            self.transport_name,
-                            stage="result_read",
-                            error=str(exc),
-                        )
-                    self._cleanup(script_path, result_path, request_path, request_work_dir)
-                    return execution.normalize_result(
-                        result,
-                        self.transport_name,
-                    )
-                elapsed = execution.elapsed_seconds(self.now_fn)
-                self.sleep_fn(determine_poll_interval(elapsed))
+            try:
+                result = self._wait_for_result_payload(artifacts.result_path, execution)
+            except TimeoutError:
+                result = None
+            except Exception as exc:
+                self._cleanup(script_path, result_path, request_path, request_work_dir)
+                return execution.build_error(
+                    self.transport_name,
+                    stage="result_read",
+                    error=str(exc),
+                )
+
+            if result is not None:
+                self._cleanup(script_path, result_path, request_path, request_work_dir)
+                return execution.normalize_result(
+                    result,
+                    self.transport_name,
+                )
 
             if artifacts.result_path.parent.exists():
                 artifacts.result_path.write_text(
@@ -117,6 +117,18 @@ class FileScriptTransport:
     ) -> None:
         cleanup_ipc_files(script_path, result_path, request_path)
         cleanup_request_dir(request_dir)
+
+    def _wait_for_result_payload(
+        self,
+        result_path: Path,
+        execution: TransportExecutionContext,
+    ) -> dict[str, object]:
+        while not execution.timed_out(self.now_fn):
+            if result_path.exists():
+                return read_ipc_result(result_path)
+            elapsed = execution.elapsed_seconds(self.now_fn)
+            self.sleep_fn(determine_poll_interval(elapsed))
+        raise TimeoutError("Timed out waiting for file transport result")
 
 
 def build_script_transport(

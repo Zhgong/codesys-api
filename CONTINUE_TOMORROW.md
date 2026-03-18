@@ -67,6 +67,8 @@ Completed so far:
   - shared success-result normalization helper in `transport_result.py`
   - shared transport execution context for request/deadline/timeout handling
   - shared execution-context helpers for standard success/error result construction
+  - file-specific result polling moved behind a private helper
+  - named-pipe exchange/retry logic moved behind a private helper
 - Added real `pytest` CODESYS E2E under `tests/e2e/codesys`
 - Split real CODESYS acceptance into:
   - fast main track
@@ -88,7 +90,7 @@ python -m py_compile HTTP_SERVER.py action_layer.py api_key_store.py codesys_pro
 
 Expected results at handoff:
 
-- `pytest`: 97 tests passing, 5 skipped without real CODESYS env
+- `pytest`: 99 tests passing, 5 skipped without real CODESYS env
 - `pytest -m "codesys and not codesys_slow"`: default real acceptance entrypoint
 - `pytest -m codesys`: full real acceptance entrypoint
 - `mypy`: success with no issues

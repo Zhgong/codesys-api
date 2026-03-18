@@ -14,6 +14,7 @@ from named_pipe_transport import (
     encode_pipe_message,
 )
 from session_transport import FileScriptTransport
+from transport_result import create_transport_execution
 
 
 def test_encode_pipe_message_round_trips_json_payload() -> None:
@@ -50,10 +51,14 @@ def test_named_pipe_transport_builds_request_and_returns_response(monkeypatch: p
     monkeypatch.setattr(named_pipe_transport, "read_pipe_payload", fake_read)
     monkeypatch.setattr(named_pipe_transport, "close_pipe_handle", lambda _handle: None)
 
-    transport = NamedPipeScriptTransport(pipe_name="codesys_api_test_pipe")
+    transport = NamedPipeScriptTransport(
+        pipe_name="codesys_api_test_pipe",
+        now_fn=lambda: 10.0,
+        sleep_fn=lambda _seconds: None,
+    )
     result = transport.execute_script("print('hello')", timeout=2)
 
-    assert captured["timeout"] == 1
+    assert captured["timeout"] == 2
     payload = captured["payload"]
     assert isinstance(payload, dict)
     assert payload["script"] == "print('hello')"
@@ -94,13 +99,63 @@ def test_named_pipe_transport_retries_transient_write_failure(
     monkeypatch.setattr(named_pipe_transport, "read_pipe_payload", fake_read)
     monkeypatch.setattr(named_pipe_transport, "close_pipe_handle", lambda _handle: None)
 
-    transport = NamedPipeScriptTransport(pipe_name="codesys_api_test_pipe")
+    transport = NamedPipeScriptTransport(
+        pipe_name="codesys_api_test_pipe",
+        now_fn=lambda: 10.0,
+        sleep_fn=lambda _seconds: None,
+    )
     result = transport.execute_script("print('hello')", timeout=2)
 
     assert calls["connect"] == 2
     assert calls["write"] == 2
     assert result["success"] is True
     assert result["transport"] == "named_pipe"
+
+
+def test_named_pipe_transport_exchange_payload_retries_transient_write_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = {"connect": 0, "write": 0, "close": 0}
+    captured: dict[str, object] = {}
+
+    def fake_connect(self: NamedPipeScriptTransport, timeout: int) -> object:
+        calls["connect"] += 1
+        return object()
+
+    def fake_write(_handle: object, payload: dict[str, object]) -> None:
+        calls["write"] += 1
+        captured["payload"] = payload
+        if calls["write"] == 1:
+            raise OSError(6, "WriteFile failed")
+
+    def fake_read(_handle: object) -> dict[str, object]:
+        request_payload = captured["payload"]
+        assert isinstance(request_payload, dict)
+        return {"request_id": request_payload["request_id"], "success": True}
+
+    monkeypatch.setattr(NamedPipeScriptTransport, "_connect", fake_connect)
+    monkeypatch.setattr(named_pipe_transport, "write_pipe_payload", fake_write)
+    monkeypatch.setattr(named_pipe_transport, "read_pipe_payload", fake_read)
+    monkeypatch.setattr(named_pipe_transport, "close_pipe_handle", lambda _handle: calls.__setitem__("close", calls["close"] + 1))
+
+    transport = NamedPipeScriptTransport(
+        pipe_name="codesys_api_test_pipe",
+        now_fn=lambda: 10.0,
+        sleep_fn=lambda _seconds: None,
+    )
+    execution = create_transport_execution(
+        script="print('hello')",
+        timeout_hint=2,
+        now_fn=lambda: 10.0,
+        request_id_factory=lambda: "req-123",
+    )
+
+    result = transport._exchange_payload(execution, execution.request.as_payload())
+
+    assert calls["connect"] == 2
+    assert calls["write"] == 2
+    assert calls["close"] == 2
+    assert result["success"] is True
 
 
 def test_named_pipe_transport_reports_connect_failure_stage(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -232,3 +287,43 @@ def test_file_transport_reports_result_read_failure_with_transport_metadata(
     assert result["error_stage"] == "result_read"
     assert "request_id" in result
     assert "invalid result payload" in str(result["error"]).lower()
+
+
+def test_file_transport_waits_for_result_payload_until_it_exists(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    request_dir = tmp_path / "requests"
+    result_dir = tmp_path / "results"
+    temp_root = tmp_path / "temp"
+    request_dir.mkdir()
+    result_dir.mkdir()
+    temp_root.mkdir()
+    result_path = temp_root / "result.json"
+
+    transport = FileScriptTransport(
+        request_dir=request_dir,
+        result_dir=result_dir,
+        temp_root=temp_root,
+        now_fn=lambda: 10.0,
+    )
+    execution = create_transport_execution(
+        script="print('hello')",
+        timeout_hint=2,
+        now_fn=lambda: 10.0,
+        request_id_factory=lambda: "req-123",
+    )
+
+    attempts = {"count": 0}
+
+    def fake_exists() -> bool:
+        attempts["count"] += 1
+        return attempts["count"] >= 2
+
+    monkeypatch.setattr(Path, "exists", lambda self: fake_exists() if self == result_path else False)
+    monkeypatch.setattr(session_transport, "read_ipc_result", lambda _path: {"success": True, "message": "ok"})
+
+    result = transport._wait_for_result_payload(result_path, execution)
+
+    assert attempts["count"] >= 2
+    assert result["success"] is True
