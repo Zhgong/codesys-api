@@ -130,3 +130,40 @@ def test_transport_execution_context_reports_remaining_seconds() -> None:
 
     assert execution.remaining_seconds(lambda: 104.5) == 7.5
     assert execution.remaining_seconds(lambda: 120.0) == 0.0
+
+
+def test_transport_execution_context_builds_standard_error() -> None:
+    execution = create_transport_execution(
+        script="print('hello')",
+        timeout_hint=12,
+        now_fn=lambda: 100.0,
+        request_id_factory=lambda: "req-123",
+    )
+
+    result = execution.build_error(
+        "named_pipe",
+        stage="connect",
+        error="connect failed",
+        retryable=False,
+    )
+
+    assert result["success"] is False
+    assert result["transport"] == "named_pipe"
+    assert result["request_id"] == "req-123"
+    assert result["error_stage"] == "connect"
+    assert result["retryable"] is False
+
+
+def test_transport_execution_context_normalizes_success_result() -> None:
+    execution = create_transport_execution(
+        script="print('hello')",
+        timeout_hint=12,
+        now_fn=lambda: 100.0,
+        request_id_factory=lambda: "req-123",
+    )
+
+    result = execution.normalize_result({"success": True, "message": "ok"}, "file")
+
+    assert result["success"] is True
+    assert result["transport"] == "file"
+    assert result["request_id"] == "req-123"

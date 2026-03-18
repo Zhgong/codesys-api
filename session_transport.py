@@ -16,9 +16,7 @@ from named_pipe_transport import NamedPipeScriptTransport
 from transport_result import (
     TransportExecutionContext,
     TransportRequest,
-    build_transport_error,
     create_transport_execution,
-    normalize_transport_result,
 )
 
 __all__ = [
@@ -82,17 +80,15 @@ class FileScriptTransport:
                         result = read_ipc_result(artifacts.result_path)
                     except Exception as exc:
                         self._cleanup(script_path, result_path, request_path, request_work_dir)
-                        return build_transport_error(
-                            transport=self.transport_name,
+                        return execution.build_error(
+                            self.transport_name,
                             stage="result_read",
                             error=str(exc),
-                            request_id=transport_request.request_id,
                         )
                     self._cleanup(script_path, result_path, request_path, request_work_dir)
-                    return normalize_transport_result(
+                    return execution.normalize_result(
                         result,
-                        transport=self.transport_name,
-                        request_id=transport_request.request_id,
+                        self.transport_name,
                     )
                 elapsed = execution.elapsed_seconds(self.now_fn)
                 self.sleep_fn(determine_poll_interval(elapsed))
@@ -106,11 +102,10 @@ class FileScriptTransport:
             return execution.build_timeout_error(self.transport_name, now_fn=self.now_fn)
         except Exception as exc:
             self._cleanup(script_path, result_path, request_path, request_work_dir)
-            return build_transport_error(
-                transport=self.transport_name,
+            return execution.build_error(
+                self.transport_name,
                 stage="request_create",
                 error=str(exc),
-                request_id=transport_request.request_id,
             )
 
     def _cleanup(

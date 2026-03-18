@@ -10,9 +10,7 @@ from typing import Any, Callable, Final
 
 from transport_result import (
     TransportExecutionContext,
-    build_transport_error,
     create_transport_execution,
-    normalize_transport_result,
 )
 
 
@@ -251,11 +249,10 @@ class NamedPipeScriptTransport:
             except TimeoutError:
                 return execution.build_timeout_error(self.transport_name, now_fn=self.now_fn)
             except OSError as exc:
-                return build_transport_error(
-                    transport=self.transport_name,
+                return execution.build_error(
+                    self.transport_name,
                     stage="connect",
                     error="Named pipe connection failed: {0}".format(exc),
-                    request_id=transport_request.request_id,
                     retryable=False,
                 )
 
@@ -269,11 +266,10 @@ class NamedPipeScriptTransport:
                     close_pipe_handle(handle)
                     continue
                 close_pipe_handle(handle)
-                return build_transport_error(
-                    transport=self.transport_name,
+                return execution.build_error(
+                    self.transport_name,
                     stage=self._error_stage_for_os_error(exc),
                     error="Named pipe transport failed: {0}".format(exc),
-                    request_id=transport_request.request_id,
                     retryable=self._should_retry_write(exc),
                 )
             except TimeoutError:
@@ -281,11 +277,10 @@ class NamedPipeScriptTransport:
                 return execution.build_timeout_error(self.transport_name, now_fn=self.now_fn)
             except (EOFError, ValueError, json.JSONDecodeError) as exc:
                 close_pipe_handle(handle)
-                return build_transport_error(
-                    transport=self.transport_name,
+                return execution.build_error(
+                    self.transport_name,
                     stage="decode",
                     error="Named pipe transport failed: {0}".format(exc),
-                    request_id=transport_request.request_id,
                     retryable=False,
                 )
 
@@ -293,18 +288,16 @@ class NamedPipeScriptTransport:
 
             response_id = result.get("request_id")
             if response_id != transport_request.request_id:
-                return build_transport_error(
-                    transport=self.transport_name,
+                return execution.build_error(
+                    self.transport_name,
                     stage="response_mismatch",
                     error="Named pipe response request_id mismatch",
-                    request_id=transport_request.request_id,
                     retryable=False,
                 )
 
-            return normalize_transport_result(
+            return execution.normalize_result(
                 result,
-                transport=self.transport_name,
-                request_id=transport_request.request_id,
+                self.transport_name,
             )
 
     def _connect(self, timeout: int) -> ctypes.c_void_p:

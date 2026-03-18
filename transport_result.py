@@ -56,6 +56,36 @@ class TransportExecutionContext:
             request_id=self.request.request_id,
         )
 
+    def build_error(
+        self,
+        transport: str,
+        *,
+        stage: str,
+        error: str,
+        retryable: bool | None = None,
+    ) -> dict[str, Any]:
+        return build_transport_error(
+            transport=transport,
+            stage=stage,
+            error=error,
+            request_id=self.request.request_id,
+            retryable=retryable,
+        )
+
+    def normalize_result(
+        self,
+        result: dict[str, object],
+        transport: str,
+        *,
+        stage: str | None = None,
+    ) -> dict[str, object]:
+        return normalize_transport_result(
+            result,
+            transport=transport,
+            request_id=self.request.request_id,
+            stage=stage,
+        )
+
 
 def create_transport_request(
     *,
