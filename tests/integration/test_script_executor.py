@@ -7,7 +7,8 @@ from pathlib import Path
 from typing import Any, cast
 
 from HTTP_SERVER import ScriptExecutor
-from session_transport import FileScriptTransport
+from named_pipe_transport import NamedPipeScriptTransport
+from session_transport import FileScriptTransport, build_script_transport
 
 
 def wait_for_request_file(request_dir: Path) -> Path:
@@ -52,6 +53,8 @@ def test_script_executor_returns_result_from_ipc(tmp_path: Path) -> None:
 
     assert result["success"] is True
     assert result["message"] == "ok"
+    assert result["transport"] == "file"
+    assert "request_id" in result
     assert list(request_dir.glob("*.request")) == []
 
 
@@ -74,6 +77,9 @@ def test_script_executor_returns_timeout_result_when_no_ipc_response_arrives(tmp
 
     assert result["success"] is False
     assert result["timeout"] is True
+    assert result["transport"] == "file"
+    assert result["error_stage"] == "timeout"
+    assert "request_id" in result
 
 
 def test_script_executor_delegates_to_transport() -> None:
@@ -92,3 +98,44 @@ def test_script_executor_delegates_to_transport() -> None:
     assert calls == [("print('hello')", 2)]
     assert result["success"] is True
     assert result["message"] == "ok"
+
+
+def test_build_script_transport_creates_file_transport(tmp_path: Path) -> None:
+    transport = build_script_transport(
+        transport_name="file",
+        request_dir=tmp_path / "requests",
+        result_dir=tmp_path / "results",
+        temp_root=tmp_path / "temp",
+        pipe_name="unused",
+    )
+
+    assert isinstance(transport, FileScriptTransport)
+    assert transport.transport_name == "file"
+
+
+def test_build_script_transport_creates_named_pipe_transport(tmp_path: Path) -> None:
+    transport = build_script_transport(
+        transport_name="named_pipe",
+        request_dir=tmp_path / "requests",
+        result_dir=tmp_path / "results",
+        temp_root=tmp_path / "temp",
+        pipe_name="codesys_api_test_pipe",
+    )
+
+    assert isinstance(transport, NamedPipeScriptTransport)
+    assert transport.transport_name == "named_pipe"
+
+
+def test_build_script_transport_rejects_unknown_transport(tmp_path: Path) -> None:
+    try:
+        build_script_transport(
+            transport_name="unknown",
+            request_dir=tmp_path / "requests",
+            result_dir=tmp_path / "results",
+            temp_root=tmp_path / "temp",
+            pipe_name="codesys_api_test_pipe",
+        )
+    except ValueError as exc:
+        assert "unsupported transport" in str(exc).lower()
+    else:
+        raise AssertionError("Expected build_script_transport to reject unknown transport")

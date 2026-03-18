@@ -60,6 +60,11 @@ Completed so far:
   - CODESYS-side named-pipe listener in `PERSISTENT_SESSION.py`
   - explicit transport error classification and metadata
   - named-pipe listener readiness check in `CodesysProcessManager.start()`
+  - shared host-side transport request and timeout helpers in `transport_result.py`
+  - reduced duplicate request/error logic between `file` and `named_pipe`
+  - explicit `build_script_transport()` contract coverage for `file`, `named_pipe`, and unsupported transports
+  - normalized transport result shape so success and error paths consistently carry `transport` and `request_id`
+  - shared success-result normalization helper in `transport_result.py`
 - Added real `pytest` CODESYS E2E under `tests/e2e/codesys`
 - Split real CODESYS acceptance into:
   - fast main track
@@ -81,7 +86,7 @@ python -m py_compile HTTP_SERVER.py action_layer.py api_key_store.py codesys_pro
 
 Expected results at handoff:
 
-- `pytest`: 83 tests passing, 5 skipped without real CODESYS env
+- `pytest`: 92 tests passing, 5 skipped without real CODESYS env
 - `pytest -m "codesys and not codesys_slow"`: default real acceptance entrypoint
 - `pytest -m codesys`: full real acceptance entrypoint
 - `mypy`: success with no issues

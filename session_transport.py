@@ -2,13 +2,10 @@ from __future__ import annotations
 
 import json
 import time
-import uuid
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
 from file_ipc import (
-    build_timeout_result,
     cleanup_ipc_files,
     cleanup_request_dir,
     create_ipc_request,
@@ -16,11 +13,16 @@ from file_ipc import (
     read_ipc_result,
 )
 from named_pipe_transport import NamedPipeScriptTransport
-from transport_result import attach_transport_metadata, build_transport_error
+from transport_result import (
+    TransportRequest,
+    build_timeout_transport_error,
+    build_transport_error,
+    create_transport_request,
+    normalize_transport_result,
+)
 
 __all__ = [
     "TransportRequest",
-    "TransportResult",
     "FileScriptTransport",
     "NamedPipeScriptTransport",
     "build_script_transport",
@@ -29,20 +31,6 @@ __all__ = [
 
 NowFn = Callable[[], float]
 SleepFn = Callable[[float], None]
-
-
-@dataclass(frozen=True)
-class TransportRequest:
-    request_id: str
-    script: str
-    timeout_hint: int
-    created_at: float
-
-
-@dataclass(frozen=True)
-class TransportResult:
-    request_id: str
-    payload: dict[str, object]
 
 
 class FileScriptTransport:
@@ -64,7 +52,11 @@ class FileScriptTransport:
         self.sleep_fn = sleep_fn
 
     def execute_script(self, script_content: str, timeout: int = 60) -> dict[str, object]:
-        request_id = str(uuid.uuid4())
+        transport_request = create_transport_request(
+            script=script_content,
+            timeout_hint=timeout,
+            now_fn=self.now_fn,
+        )
         script_path: str | None = None
         result_path: str | None = None
         request_path: str | None = None
@@ -73,7 +65,7 @@ class FileScriptTransport:
         try:
             artifacts = create_ipc_request(
                 script_content=script_content,
-                request_id=request_id,
+                request_id=transport_request.request_id,
                 request_root=self.request_dir,
                 temp_root=self.temp_root,
             )
@@ -93,24 +85,32 @@ class FileScriptTransport:
                             transport=self.transport_name,
                             stage="result_read",
                             error=str(exc),
+                            request_id=transport_request.request_id,
                         )
                     self._cleanup(script_path, result_path, request_path, request_work_dir)
-                    return attach_transport_metadata(result, transport=self.transport_name)
+                    return normalize_transport_result(
+                        result,
+                        transport=self.transport_name,
+                        request_id=transport_request.request_id,
+                    )
                 elapsed = self.now_fn() - start_time
                 self.sleep_fn(determine_poll_interval(elapsed))
 
             elapsed = self.now_fn() - start_time
             if artifacts.result_path.parent.exists():
                 artifacts.result_path.write_text(
-                    json.dumps(build_timeout_result(elapsed)),
+                    json.dumps(build_timeout_transport_error(
+                        transport=self.transport_name,
+                        elapsed_seconds=elapsed,
+                        request_id=transport_request.request_id,
+                    )),
                     encoding="utf-8",
                 )
             self._cleanup(script_path, None, request_path, request_work_dir)
-            return build_transport_error(
+            return build_timeout_transport_error(
                 transport=self.transport_name,
-                stage="timeout",
-                error=str(build_timeout_result(elapsed)["error"]),
-                timeout=True,
+                elapsed_seconds=elapsed,
+                request_id=transport_request.request_id,
             )
         except Exception as exc:
             self._cleanup(script_path, result_path, request_path, request_work_dir)
@@ -118,6 +118,7 @@ class FileScriptTransport:
                 transport=self.transport_name,
                 stage="request_create",
                 error=str(exc),
+                request_id=transport_request.request_id,
             )
 
     def _cleanup(

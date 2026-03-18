@@ -4,13 +4,16 @@ import ctypes
 import json
 import struct
 import time
-import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Callable, Final
 
-from file_ipc import build_timeout_result
-from transport_result import attach_transport_metadata, build_transport_error
+from transport_result import (
+    build_timeout_transport_error,
+    build_transport_error,
+    create_transport_request,
+    normalize_transport_result,
+)
 
 
 INVALID_HANDLE_VALUE: Final[int] = -1
@@ -229,35 +232,38 @@ class NamedPipeScriptTransport:
         self.sleep_fn = sleep_fn
 
     def execute_script(self, script_content: str, timeout: int = 60) -> dict[str, object]:
-        request_id = str(uuid.uuid4())
-        payload = {
-            "request_id": request_id,
-            "script": script_content,
-            "timeout_hint": timeout,
-            "created_at": self.now_fn(),
-        }
+        transport_request = create_transport_request(
+            script=script_content,
+            timeout_hint=timeout,
+            now_fn=self.now_fn,
+        )
+        payload = transport_request.as_payload()
         deadline = self.now_fn() + timeout
         attempts = 0
 
         while True:
             remaining = deadline - self.now_fn()
             if remaining <= 0:
-                return build_timeout_result(float(timeout))
+                return build_timeout_transport_error(
+                    transport=self.transport_name,
+                    elapsed_seconds=float(timeout),
+                    request_id=transport_request.request_id,
+                )
 
             try:
                 handle = self._connect(max(1, int(remaining)))
             except TimeoutError:
-                return build_transport_error(
+                return build_timeout_transport_error(
                     transport=self.transport_name,
-                    stage="timeout",
-                    error=str(build_timeout_result(float(timeout))["error"]),
-                    timeout=True,
+                    elapsed_seconds=float(timeout),
+                    request_id=transport_request.request_id,
                 )
             except OSError as exc:
                 return build_transport_error(
                     transport=self.transport_name,
                     stage="connect",
                     error="Named pipe connection failed: {0}".format(exc),
+                    request_id=transport_request.request_id,
                     retryable=False,
                 )
 
@@ -275,15 +281,15 @@ class NamedPipeScriptTransport:
                     transport=self.transport_name,
                     stage=self._error_stage_for_os_error(exc),
                     error="Named pipe transport failed: {0}".format(exc),
+                    request_id=transport_request.request_id,
                     retryable=self._should_retry_write(exc),
                 )
             except TimeoutError:
                 close_pipe_handle(handle)
-                return build_transport_error(
+                return build_timeout_transport_error(
                     transport=self.transport_name,
-                    stage="timeout",
-                    error=str(build_timeout_result(float(timeout))["error"]),
-                    timeout=True,
+                    elapsed_seconds=float(timeout),
+                    request_id=transport_request.request_id,
                 )
             except (EOFError, ValueError, json.JSONDecodeError) as exc:
                 close_pipe_handle(handle)
@@ -291,21 +297,27 @@ class NamedPipeScriptTransport:
                     transport=self.transport_name,
                     stage="decode",
                     error="Named pipe transport failed: {0}".format(exc),
+                    request_id=transport_request.request_id,
                     retryable=False,
                 )
 
             close_pipe_handle(handle)
 
             response_id = result.get("request_id")
-            if response_id != request_id:
+            if response_id != transport_request.request_id:
                 return build_transport_error(
                     transport=self.transport_name,
                     stage="response_mismatch",
                     error="Named pipe response request_id mismatch",
+                    request_id=transport_request.request_id,
                     retryable=False,
                 )
 
-            return attach_transport_metadata(result, transport=self.transport_name)
+            return normalize_transport_result(
+                result,
+                transport=self.transport_name,
+                request_id=transport_request.request_id,
+            )
 
     def _connect(self, timeout: int) -> ctypes.c_void_p:
         pipe_path = build_pipe_path(self.config.pipe_name)

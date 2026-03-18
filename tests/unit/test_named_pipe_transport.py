@@ -60,6 +60,8 @@ def test_named_pipe_transport_builds_request_and_returns_response(monkeypatch: p
     assert payload["timeout_hint"] == 2
     assert result["success"] is True
     assert result["message"] == "ok"
+    assert result["transport"] == "named_pipe"
+    assert "request_id" in result
 
 
 def test_named_pipe_transport_retries_transient_write_failure(
@@ -98,6 +100,7 @@ def test_named_pipe_transport_retries_transient_write_failure(
     assert calls["connect"] == 2
     assert calls["write"] == 2
     assert result["success"] is True
+    assert result["transport"] == "named_pipe"
 
 
 def test_named_pipe_transport_reports_connect_failure_stage(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -112,7 +115,23 @@ def test_named_pipe_transport_reports_connect_failure_stage(monkeypatch: pytest.
     assert result["success"] is False
     assert result["transport"] == "named_pipe"
     assert result["error_stage"] == "connect"
+    assert "request_id" in result
     assert "connecting to named pipe" in str(result["error"]).lower()
+
+
+def test_named_pipe_transport_reports_timeout_with_transport_metadata() -> None:
+    transport = NamedPipeScriptTransport(
+        pipe_name="codesys_api_test_pipe",
+        now_fn=lambda: 10.0,
+    )
+
+    result = transport.execute_script("print('hello')", timeout=0)
+
+    assert result["success"] is False
+    assert result["transport"] == "named_pipe"
+    assert result["error_stage"] == "timeout"
+    assert result["timeout"] is True
+    assert "request_id" in result
 
 
 def test_named_pipe_transport_reports_response_mismatch_stage(
@@ -135,6 +154,7 @@ def test_named_pipe_transport_reports_response_mismatch_stage(
     assert result["success"] is False
     assert result["transport"] == "named_pipe"
     assert result["error_stage"] == "response_mismatch"
+    assert "request_id" in result
     assert "request_id mismatch" in str(result["error"]).lower()
 
 
@@ -158,6 +178,7 @@ def test_file_transport_reports_timeout_with_transport_metadata(tmp_path: Path) 
     assert result["transport"] == "file"
     assert result["error_stage"] == "timeout"
     assert result["timeout"] is True
+    assert "request_id" in result
 
 
 def test_file_transport_reports_result_read_failure_with_transport_metadata(
@@ -209,4 +230,5 @@ def test_file_transport_reports_result_read_failure_with_transport_metadata(
     assert result["success"] is False
     assert result["transport"] == "file"
     assert result["error_stage"] == "result_read"
+    assert "request_id" in result
     assert "invalid result payload" in str(result["error"]).lower()
