@@ -38,6 +38,14 @@ class ServerConfig:
         return self.transport_name in LEGACY_TRANSPORTS
 
     @property
+    def transport_is_primary(self) -> bool:
+        return self.transport_name == DEFAULT_TRANSPORT
+
+    @property
+    def transport_requires_explicit_opt_in(self) -> bool:
+        return self.transport_is_legacy
+
+    @property
     def transport_role(self) -> str:
         if self.transport_is_legacy:
             return "legacy_fallback"

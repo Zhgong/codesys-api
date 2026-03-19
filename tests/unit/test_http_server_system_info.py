@@ -25,6 +25,27 @@ def test_build_system_info_reports_named_pipe_as_primary() -> None:
     assert info["recommended_transport"] == "named_pipe"
 
 
+def test_build_system_info_uses_config_transport_role_helpers(monkeypatch: Any) -> None:
+    class FakeConfig:
+        transport_name = "named_pipe"
+        transport_is_primary = True
+        transport_is_legacy = False
+        transport_requires_explicit_opt_in = False
+        transport_role = "primary"
+        recommended_transport = "named_pipe"
+
+    monkeypatch.setattr(HTTP_SERVER, "APP_CONFIG", FakeConfig())
+    monkeypatch.setattr(HTTP_SERVER, "TRANSPORT_NAME", "named_pipe")
+    monkeypatch.setattr(HTTP_SERVER, "PIPE_NAME", "codesys_api_session")
+
+    info = build_system_info(FakeProcessManager(True))
+
+    assert info["transport"] == "named_pipe"
+    assert info["transport_role"] == "primary"
+    assert info["transport_legacy"] is False
+    assert info["recommended_transport"] == "named_pipe"
+
+
 def test_build_system_info_has_stable_transport_fields() -> None:
     info = build_system_info(FakeProcessManager(False))
     process_manager = cast(dict[str, object], info["process_manager"])
@@ -47,8 +68,10 @@ def test_build_system_info_has_stable_transport_fields() -> None:
 
 def test_build_system_info_reports_file_as_legacy(monkeypatch: Any) -> None:
     class FakeConfig:
+        transport_is_primary = False
         transport_role = "legacy_fallback"
         transport_is_legacy = True
+        transport_requires_explicit_opt_in = True
         recommended_transport = "named_pipe"
 
     monkeypatch.setattr(HTTP_SERVER, "APP_CONFIG", FakeConfig())

@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import legacy_file_transport
 import pytest
 import session_transport
 from file_ipc import FileIpcRequestArtifacts
-from session_transport import FileScriptTransport
+from legacy_file_transport import FileScriptTransport, build_legacy_file_transport
+from session_transport import build_script_transport
 from transport_result import create_transport_execution
 
 
@@ -60,7 +62,7 @@ def test_legacy_file_transport_reports_result_read_failure_with_transport_metada
     request_path.write_text("{}", encoding="utf-8")
 
     monkeypatch.setattr(
-        session_transport,
+        legacy_file_transport,
         "create_ipc_request",
         lambda **_kwargs: FileIpcRequestArtifacts(
             request_id=request_id,
@@ -71,7 +73,7 @@ def test_legacy_file_transport_reports_result_read_failure_with_transport_metada
         ),
     )
     monkeypatch.setattr(
-        session_transport,
+        legacy_file_transport,
         "read_ipc_result",
         lambda _path: (_ for _ in ()).throw(ValueError("invalid result payload")),
     )
@@ -117,9 +119,55 @@ def test_legacy_file_transport_waits_for_result_payload_until_it_exists(
         return attempts["count"] >= 2
 
     monkeypatch.setattr(Path, "exists", lambda self: fake_exists() if self == result_path else False)
-    monkeypatch.setattr(session_transport, "read_ipc_result", lambda _path: {"success": True, "message": "ok"})
+    monkeypatch.setattr(legacy_file_transport, "read_ipc_result", lambda _path: {"success": True, "message": "ok"})
 
     result = transport._wait_for_result_payload(result_path, execution)
 
     assert attempts["count"] >= 2
     assert result["success"] is True
+
+
+def test_build_legacy_file_transport_creates_file_transport(tmp_path: Path) -> None:
+    transport = build_legacy_file_transport(
+        request_dir=tmp_path / "requests",
+        result_dir=tmp_path / "results",
+        temp_root=tmp_path / "temp",
+    )
+
+    assert isinstance(transport, FileScriptTransport)
+    assert transport.transport_name == "file"
+
+
+def test_build_script_transport_routes_file_through_legacy_builder(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    legacy_transport = FileScriptTransport(
+        request_dir=tmp_path / "requests",
+        result_dir=tmp_path / "results",
+        temp_root=tmp_path / "temp",
+    )
+    called: dict[str, object] = {}
+
+    def fake_build_legacy_file_transport(**kwargs: object) -> FileScriptTransport:
+        called.update(kwargs)
+        return legacy_transport
+
+    monkeypatch.setattr(
+        session_transport,
+        "build_legacy_file_transport",
+        fake_build_legacy_file_transport,
+    )
+
+    transport = build_script_transport(
+        transport_name="file",
+        request_dir=tmp_path / "requests",
+        result_dir=tmp_path / "results",
+        temp_root=tmp_path / "temp",
+        pipe_name="unused",
+    )
+
+    assert transport is legacy_transport
+    assert called["request_dir"] == tmp_path / "requests"
+    assert called["result_dir"] == tmp_path / "results"
+    assert called["temp_root"] == tmp_path / "temp"

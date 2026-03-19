@@ -6,6 +6,25 @@ This project was forked and already contains a working REST API, a persistent CO
 
 The immediate goal is not to replace everything at once. The immediate goal is to make the current codebase safe to change, define the intended target architecture, and create the internal seams needed for later migration to a cleaner execution model, CLI entrypoint, future AI-oriented tooling, and a future CODESYS script engine that may replace the current IronPython-based script engine.
 
+## Current Checkpoint
+
+The early restructuring phases are largely complete:
+
+- host-side modules, tests, and strict typing are in place
+- the action layer and engine adapter boundary are active
+- real CODESYS runtime hardening has been validated
+- named-pipe transport is now the standard path
+- file transport remains only as an explicit legacy fallback and compatibility baseline
+
+The current work is not a new transport rewrite. The current work is a soft-deprecation pass that keeps default documentation, default acceptance habits, and operational guidance centered on `named_pipe` while preserving `file` only for compatibility and retirement-readiness evaluation.
+
+The immediate follow-up to that soft deprecation is host-side removal prep:
+
+- keep `file` available only through explicit host-side legacy seams
+- isolate the host-side file implementation into removable legacy-focused modules
+- preserve the current file path inside `PERSISTENT_SESSION.py`
+- make eventual host-side file transport removal a mechanical follow-on step rather than a redesign
+
 ## Target Architecture
 
 The long-term architecture should be organized into five layers:
@@ -64,6 +83,7 @@ The current transport stance is:
 - `named_pipe` is the recommended primary transport
 - `file` remains available only as a legacy fallback and compatibility baseline
 - file-transport retirement should happen only after explicit readiness criteria are met
+- file-specific baseline tests should remain isolated from the default named-pipe transport narrative
 
 ## Execution Strategy
 
@@ -264,6 +284,12 @@ The key principle is to avoid changing transport, public interface, engine imple
 
 Performance is a benefit, but not the only reason for transport improvement. Reliability, error clarity, and maintainability are higher-priority goals.
 
+During the current soft-deprecation phase:
+
+- default documentation and default acceptance flows should assume `named_pipe`
+- `file` should only appear as a manual fallback, compatibility baseline, or retirement-readiness concern
+- file-specific tests should stay segregated from the main transport test narrative
+
 ## Phase 7: CLI and Future Integrations
 
 ### Goals
@@ -312,9 +338,8 @@ The migration is considered healthy only if:
 
 ## Immediate Next Steps
 
-1. Document the current architecture and execution flow in detail
-2. Build the minimum regression suite around current API behavior
-3. Define and introduce the internal action schema
-4. Define the engine adapter boundary and map current IronPython responsibilities into it
-5. Refactor the current server and session logic behind those boundaries
-6. Only then begin transport evolution and CLI work
+1. Continue transport soft deprecation with `named_pipe` as the only recommended path
+2. Continue host-side removal prep while keeping `file` only as an explicit legacy fallback and minimal compatibility baseline
+3. Measure the current transport state against `FILE_TRANSPORT_RETIREMENT.md` before any actual removal work
+4. Keep default real acceptance centered on `named_pipe`; run `file` only for legacy baseline and compatibility checks
+5. Decide between `file` removal prep and CLI only after the transport stage remains stable under this softer deprecation model

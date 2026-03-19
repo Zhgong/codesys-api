@@ -572,9 +572,9 @@ def run_server():
         
         print("Starting server on {0}:{1}".format(SERVER_HOST, SERVER_PORT))
         logger.info("Starting server on %s:%d", SERVER_HOST, SERVER_PORT)
-        if APP_CONFIG.transport_is_legacy:
+        if APP_CONFIG.transport_requires_explicit_opt_in:
             logger.warning(
-                "Using legacy fallback transport: %s (recommended: %s)",
+                "Using explicit legacy fallback transport: %s (recommended primary: %s)",
                 APP_CONFIG.transport_name,
                 APP_CONFIG.recommended_transport,
             )

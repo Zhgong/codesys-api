@@ -16,6 +16,8 @@ def test_load_server_config_uses_current_repo_defaults(tmp_path: Path) -> None:
     assert config.codesys_no_ui is False
     assert config.transport_name == "named_pipe"
     assert config.transport_is_legacy is False
+    assert config.transport_is_primary is True
+    assert config.transport_requires_explicit_opt_in is False
     assert config.transport_role == "primary"
     assert config.recommended_transport == "named_pipe"
     assert config.pipe_name == "codesys_api_session"
@@ -52,6 +54,8 @@ def test_load_server_config_accepts_environment_overrides(tmp_path: Path) -> Non
     assert config.codesys_no_ui is True
     assert config.transport_name == "file"
     assert config.transport_is_legacy is True
+    assert config.transport_is_primary is False
+    assert config.transport_requires_explicit_opt_in is True
     assert config.transport_role == "legacy_fallback"
     assert config.recommended_transport == "named_pipe"
     assert config.pipe_name == "codesys_api_test_pipe"

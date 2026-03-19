@@ -8,8 +8,22 @@ CODESYS acceptance.
 
 Latest checkpoint:
 
-- Commit `1313e6f` landed the current soft-deprecation phase for `file` transport.
-- The current uncommitted follow-up is the legacy baseline test split for `file` transport.
+- Commit `dea2974` landed the legacy baseline test split for `file` transport.
+- Current follow-up is host-side file-removal prep in:
+  - `CONTINUE_TOMORROW.md`
+  - `FILE_TRANSPORT_RETIREMENT.md`
+  - `HTTP_SERVER.py`
+  - `STRATEGIC_PLAN.md`
+  - `codesys_e2e_policy.py`
+  - `legacy_file_transport.py`
+  - `pyproject.toml`
+  - `server_config.py`
+  - `session_transport.py`
+  - `tests/integration/test_file_transport_legacy_baseline.py`
+  - `tests/unit/test_file_transport_legacy_unit.py`
+  - `tests/unit/test_http_server_system_info.py`
+  - `tests/unit/test_real_codesys_e2e_policy.py`
+  - `tests/unit/test_server_config.py`
 
 Completed so far:
 
@@ -89,6 +103,11 @@ Completed so far:
   - `tests/unit/test_file_transport_legacy_unit.py`
   - `tests/integration/test_script_executor.py` now focuses on generic / named-pipe coverage
   - `tests/unit/test_named_pipe_transport.py` now focuses on named-pipe coverage
+- Started host-side file-removal prep without deleting file transport:
+  - `server_config.py` now exposes explicit primary / legacy transport helpers
+  - `session_transport.py` now routes the file branch through `build_legacy_file_transport()`
+  - `legacy_file_transport.py` now contains the isolated host-side file transport implementation
+  - legacy-path tests now lock the file branch behind a dedicated host-side removal seam
 - Tightened runtime recovery behavior:
   - `stop_session()` and `start_session()` now wait for state convergence in real E2E
   - fallback compile now saves and closes the project before restarting in UI mode
@@ -106,11 +125,25 @@ python -m py_compile HTTP_SERVER.py action_layer.py api_key_store.py codesys_e2e
 
 Expected results at handoff:
 
-- `pytest`: 110 tests passing, 5 skipped without real CODESYS env
+- `pytest`: 115 tests passing, 5 skipped without real CODESYS env
 - `pytest -m "codesys and not codesys_slow"`: default real acceptance entrypoint
-- `pytest -m codesys`: full real acceptance entrypoint
-- `mypy`: success with no issues
-- `git status --short`: should show the legacy baseline test split files plus `M CONTINUE_TOMORROW.md`
+- `pytest -m codesys`: default full acceptance entrypoint for `named_pipe`
+- `mypy`: success with no issues in 28 source files
+- `git status --short`: currently expected to show host-side removal-prep changes in:
+  - `CONTINUE_TOMORROW.md`
+  - `FILE_TRANSPORT_RETIREMENT.md`
+  - `HTTP_SERVER.py`
+  - `STRATEGIC_PLAN.md`
+  - `codesys_e2e_policy.py`
+  - `legacy_file_transport.py`
+  - `pyproject.toml`
+  - `server_config.py`
+  - `session_transport.py`
+  - `tests/integration/test_file_transport_legacy_baseline.py`
+  - `tests/unit/test_file_transport_legacy_unit.py`
+  - `tests/unit/test_http_server_system_info.py`
+  - `tests/unit/test_real_codesys_e2e_policy.py`
+  - `tests/unit/test_server_config.py`
 
 Verified real acceptance results:
 
@@ -134,16 +167,17 @@ Verified real acceptance results:
 - `file` is no longer the peer default path; it is a manual legacy fallback for compatibility and transport debugging.
 - Slow-track real E2E now defaults to `named_pipe`; `file` only runs fast-track unless `CODESYS_E2E_FILE_FULL=1`.
 - The current `file` removal criteria live in `FILE_TRANSPORT_RETIREMENT.md`.
+- Host-side removal prep is active, but `PERSISTENT_SESSION.py` still keeps the file path intact.
+- The host-side file implementation now lives in `legacy_file_transport.py`; `session_transport.py` keeps the primary transport entrypoint and the legacy branch wiring only.
 
 ## Next Best Steps
 
-1. Continue transport evolution with `named_pipe` as the standard path.
+1. Continue host-side file-removal prep with `named_pipe` as the standard path.
 2. Keep `file` only as a minimal compatibility baseline while measuring against `FILE_TRANSPORT_RETIREMENT.md`.
-3. Finish the legacy baseline test split checkpoint before starting a new transport sub-phase.
-4. Continue soft-deprecation work after that: keep docs, diagnostics, and test habits aligned with `named_pipe` primary / `file` legacy fallback.
-5. Focus on transport diagnostics, edge-case recovery, and evidence that `file` can later become a removal candidate.
-6. Keep the real CODESYS E2E as the phase-boundary runtime acceptance test, not just a happy-path smoke.
-7. Do not reopen the `--noUI` compile issue unless new regressions appear.
+3. Continue isolating host-side file code so future removal becomes mechanical instead of structural.
+4. Do not touch `PERSISTENT_SESSION.py` file transport paths yet.
+5. Keep the real CODESYS E2E as the phase-boundary runtime acceptance test, not just a happy-path smoke.
+6. Do not reopen the `--noUI` compile issue unless new regressions appear.
 
 ## Recommended Sequence For Next Session
 
@@ -156,7 +190,8 @@ Reason:
 - The slow runtime-hardening track is now also verified with `named_pipe`
 - `named_pipe` is now the only recommended transport path
 - The current checkpoint already includes `file` soft deprecation and retirement-readiness documentation
-- The immediate follow-up checkpoint is to keep file-specific coverage in dedicated legacy baseline tests
+- The current checkpoint also keeps file-specific coverage isolated in dedicated legacy baseline tests
+- The current follow-up is now code-level host-side removal prep, not just doc alignment
 - CLI is still lower priority than transport reliability
 
 ## Quick Resume Checklist

@@ -7,7 +7,8 @@ from pathlib import Path
 from typing import Any, cast
 
 from HTTP_SERVER import ScriptExecutor
-from session_transport import FileScriptTransport, build_script_transport
+from legacy_file_transport import FileScriptTransport, build_legacy_file_transport
+from session_transport import build_script_transport
 
 
 def wait_for_request_file(request_dir: Path) -> Path:
@@ -81,7 +82,18 @@ def test_legacy_file_transport_returns_timeout_result_when_no_ipc_response_arriv
     assert "request_id" in result
 
 
-def test_build_script_transport_creates_legacy_file_transport(tmp_path: Path) -> None:
+def test_build_legacy_file_transport_creates_legacy_file_transport(tmp_path: Path) -> None:
+    transport = build_legacy_file_transport(
+        request_dir=tmp_path / "requests",
+        result_dir=tmp_path / "results",
+        temp_root=tmp_path / "temp",
+    )
+
+    assert isinstance(transport, FileScriptTransport)
+    assert transport.transport_name == "file"
+
+
+def test_build_script_transport_still_supports_legacy_file_branch(tmp_path: Path) -> None:
     transport = build_script_transport(
         transport_name="file",
         request_dir=tmp_path / "requests",

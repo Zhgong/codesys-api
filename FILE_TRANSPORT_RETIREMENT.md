@@ -29,6 +29,15 @@ only when all of the following are true:
 - This document does not change REST API behavior.
 - This document does not change the default environment variables.
 
+## Current Prep Boundary
+
+The active prep work is host-side only:
+
+- keep `file` behind explicit legacy builders, config helpers, and legacy baseline tests
+- isolate the host-side file transport implementation so later removal is mechanical
+- keep default diagnostics and default acceptance centered on `named_pipe`
+- do not yet change the file transport path inside `PERSISTENT_SESSION.py`
+
 ## Next Step After Readiness
 
 Once the readiness criteria are satisfied for a sustained period, the next phase

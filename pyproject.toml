@@ -21,6 +21,7 @@ files = [
     "engine_adapter.py",
     "file_ipc.py",
     "ironpython_script_engine.py",
+    "legacy_file_transport.py",
     "server_config.py",
     "server_logic.py",
     "tests/integration",
