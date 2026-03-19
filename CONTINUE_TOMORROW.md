@@ -6,6 +6,11 @@ The host-side refactor, engine adapter landing, runtime hardening, and transport
 primary-path work are now far enough along to support both fast and full real
 CODESYS acceptance.
 
+Latest checkpoint:
+
+- Commit `1313e6f` landed the current soft-deprecation phase for `file` transport.
+- The current uncommitted follow-up is the legacy baseline test split for `file` transport.
+
 Completed so far:
 
 - Added `pytest` and `mypy --strict` in `pyproject.toml`
@@ -77,6 +82,13 @@ Completed so far:
 - Split real CODESYS acceptance into:
   - fast main track
   - slow runtime-hardening track
+- Added explicit E2E transport policy helpers in `codesys_e2e_policy.py`
+- Added `FILE_TRANSPORT_RETIREMENT.md` to record when `file` can move from legacy fallback to removal candidate
+- Split file-specific transport coverage out of the main transport tests:
+  - `tests/integration/test_file_transport_legacy_baseline.py`
+  - `tests/unit/test_file_transport_legacy_unit.py`
+  - `tests/integration/test_script_executor.py` now focuses on generic / named-pipe coverage
+  - `tests/unit/test_named_pipe_transport.py` now focuses on named-pipe coverage
 - Tightened runtime recovery behavior:
   - `stop_session()` and `start_session()` now wait for state convergence in real E2E
   - fallback compile now saves and closes the project before restarting in UI mode
@@ -89,15 +101,16 @@ These commands were green at the end of the session:
 ```powershell
 python -m pytest -q
 python -m mypy
-python -m py_compile HTTP_SERVER.py action_layer.py api_key_store.py codesys_process.py server_config.py file_ipc.py server_logic.py test_server.py ironpython_script_engine.py engine_adapter.py named_pipe_transport.py session_transport.py transport_result.py tests/e2e/codesys/test_real_codesys_e2e.py
+python -m py_compile HTTP_SERVER.py action_layer.py api_key_store.py codesys_e2e_policy.py codesys_process.py server_config.py file_ipc.py server_logic.py test_server.py ironpython_script_engine.py engine_adapter.py named_pipe_transport.py session_transport.py transport_result.py tests/e2e/codesys/test_real_codesys_e2e.py tests/integration/test_file_transport_legacy_baseline.py tests/integration/test_script_executor.py tests/unit/test_file_transport_legacy_unit.py tests/unit/test_http_server_system_info.py tests/unit/test_named_pipe_transport.py tests/unit/test_real_codesys_e2e_policy.py
 ```
 
 Expected results at handoff:
 
-- `pytest`: 103 tests passing, 5 skipped without real CODESYS env
+- `pytest`: 110 tests passing, 5 skipped without real CODESYS env
 - `pytest -m "codesys and not codesys_slow"`: default real acceptance entrypoint
 - `pytest -m codesys`: full real acceptance entrypoint
 - `mypy`: success with no issues
+- `git status --short`: should show the legacy baseline test split files plus `M CONTINUE_TOMORROW.md`
 
 Verified real acceptance results:
 
@@ -126,9 +139,11 @@ Verified real acceptance results:
 
 1. Continue transport evolution with `named_pipe` as the standard path.
 2. Keep `file` only as a minimal compatibility baseline while measuring against `FILE_TRANSPORT_RETIREMENT.md`.
-3. Focus on transport diagnostics, edge-case recovery, and evidence that `file` can later become a removal candidate.
-4. Keep the real CODESYS E2E as the phase-boundary runtime acceptance test, not just a happy-path smoke.
-5. Do not reopen the `--noUI` compile issue unless new regressions appear.
+3. Finish the legacy baseline test split checkpoint before starting a new transport sub-phase.
+4. Continue soft-deprecation work after that: keep docs, diagnostics, and test habits aligned with `named_pipe` primary / `file` legacy fallback.
+5. Focus on transport diagnostics, edge-case recovery, and evidence that `file` can later become a removal candidate.
+6. Keep the real CODESYS E2E as the phase-boundary runtime acceptance test, not just a happy-path smoke.
+7. Do not reopen the `--noUI` compile issue unless new regressions appear.
 
 ## Recommended Sequence For Next Session
 
@@ -140,6 +155,8 @@ Reason:
 - The real happy path is already verified end-to-end
 - The slow runtime-hardening track is now also verified with `named_pipe`
 - `named_pipe` is now the only recommended transport path
+- The current checkpoint already includes `file` soft deprecation and retirement-readiness documentation
+- The immediate follow-up checkpoint is to keep file-specific coverage in dedicated legacy baseline tests
 - CLI is still lower priority than transport reliability
 
 ## Quick Resume Checklist

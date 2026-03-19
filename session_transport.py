@@ -33,6 +33,8 @@ SleepFn = Callable[[float], None]
 
 
 class FileScriptTransport:
+    """Legacy file-backed transport kept as an explicit fallback path."""
+
     transport_name = "file"
 
     def __init__(
@@ -141,6 +143,8 @@ def build_script_transport(
     now_fn: NowFn = time.time,
     sleep_fn: SleepFn = time.sleep,
 ) -> FileScriptTransport | NamedPipeScriptTransport:
+    """Build the configured transport, preferring named pipes as the primary path."""
+
     if transport_name == "file":
         return FileScriptTransport(
             request_dir=request_dir,
