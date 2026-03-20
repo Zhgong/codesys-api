@@ -9,8 +9,9 @@ The repository has already completed the heavy internal transition:
 - engine adapter boundary
 - named-pipe-only transport
 - lifecycle cleanup phase 2
+- baseline phase
 
-The transport, lifecycle, compile-hardening, and local CLI lines are now all substantially complete. The next strategic priority should be chosen outside the old transport/lifecycle cleanup track.
+The transport, lifecycle, compile-hardening, and local CLI lines are now all substantially complete. The current priority is to formalize the baseline before structural work.
 
 ## Current Checkpoint
 
@@ -22,6 +23,7 @@ Completed lines:
 - compile hardening is done
 - CLI v1 and v2 command coverage are in place
 - CLI final polish is in place
+- formal baseline documentation and runner are in place
 
 Current CLI coverage now includes:
 
@@ -71,12 +73,18 @@ Current CLI coverage now includes:
 
 ### Active Phase
 
-No active implementation phase is locked yet.
+Baseline establishment:
 
-The next major phase should be chosen from new product-facing work, not old transport/lifecycle cleanup.
+- `BASELINE.md` defines the current gates and real acceptance expectations
+- `scripts/run_baseline.py` provides the local engineering baseline entrypoint
+- the baseline now gates the next two major phases:
+  - repo reorganization
+  - packaging
 
 ### Deferred
 
+- repo reorganization
+- packaging for `pip install .`
 - broader CLI packaging/distribution
 - future AI/tool integration surfaces
 
@@ -85,5 +93,5 @@ The next major phase should be chosen from new product-facing work, not old tran
 - Do not reopen transport design unless a regression forces it.
 - Keep REST API v1 stable.
 - Keep `named_pipe` as the only supported runtime transport.
-- Prefer new product-facing value over reopening old cleanup work.
 - Treat lifecycle cleanup as done unless a regression appears.
+- Use the baseline before any repo reorg or packaging work.

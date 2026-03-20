@@ -2,46 +2,29 @@
 
 ## Current State
 
-The transport and lifecycle cleanup lines are complete enough for normal development:
+The old transport and lifecycle main line is complete:
 
 - `named_pipe` is the only supported runtime transport
 - host-side and CODESYS-side file transport paths are gone
-- file-based control and status are gone
-- file-based logging is gone
+- file-based control, status, and logging are gone
 - `/api/v1/system/logs` now reads from an in-memory runtime log buffer
 
-CLI productization is complete enough for normal use:
+CLI is complete enough for normal local use:
 
 - CLI v1 and v2 command coverage are implemented
+- local entrypoints and usage docs are in place
 - real CLI positive and negative smoke paths exist
-- the next work is no longer command expansion by default
-- productization is complete:
-  - formal local entrypoint
-  - usage documentation
-  - contract tests for docs and launcher
+
+The current active line is now baseline establishment:
+
+- `BASELINE.md` defines the current engineering, contract, and real-CODESYS baseline
+- `scripts/run_baseline.py` runs the local engineering baseline
+- baseline documentation tests lock the commands and references
+
 Latest stable checkpoints:
 
-- `5ef1e1c` completed CLI v1 smoke coverage
-- `64a9595` expanded the CLI main workflow coverage
-- `eed289f` productized the local CLI entrypoint
-- `274d0a8` improved CLI usability and setup errors
-- `f2521ea` finalized the CLI polish pass
-
-## Current Follow-Up
-
-Current uncommitted work completes lifecycle cleanup phase 2:
-
-- `HTTP_SERVER.py`
-- `PERSISTENT_SESSION.py`
-- `app_runtime.py`
-- `codesys_process.py`
-- `CONTINUE_TOMORROW.md`
-- `STRATEGIC_PLAN.md`
-- `server_config.py`
-- `tests/unit/test_codesys_process.py`
-- `tests/unit/test_http_server_system_logs.py`
-- `tests/unit/test_persistent_session_contract.py`
-- `tests/unit/test_server_config.py`
+- `3a16ec9` completed transport cleanup and established the local CLI
+- `8e0d4d3` replaced file-based session logs with a runtime buffer
 
 ## Verification Status
 
@@ -55,9 +38,9 @@ python -m py_compile HTTP_SERVER.py action_layer.py api_key_store.py app_runtime
 
 Expected results at handoff:
 
-- `pytest`: `147 passed, 8 skipped`
-- `mypy`: success with no issues in `35` source files
-- `git status --short`: expected to show only the lifecycle cleanup phase 2 follow-up files listed above
+- `pytest`: `150 passed, 8 skipped`
+- `mypy`: success with no issues in `36` source files
+- `git status --short`: expected to show only the baseline follow-up files if this phase is still uncommitted
 
 Real validation already confirmed:
 
@@ -74,7 +57,7 @@ Real validation already confirmed:
   - `session stop`
 - CLI negative compile detection works when breaking `Application\PLC_PRG`
 
-This round did not run real CODESYS acceptance because local gates were sufficient to land the in-memory logging refactor. If needed, validate `/api/v1/system/logs` on a real session before the next checkpoint.
+This round did not rerun real CODESYS acceptance. The baseline documents the current real acceptance commands and expectations, but local gates were the required proof for this phase.
 
 ## Important Constraints
 
@@ -94,18 +77,17 @@ This round did not run real CODESYS acceptance because local gates were sufficie
    - improve grouped help examples
    - keep human-readable output and setup errors consistent with `CLI_USAGE.md`
 3. Do not add more commands by default unless a clearly missing workflow appears.
-4. After this phase lands, lifecycle cleanup is effectively done.
-5. The next stage should be chosen outside the old transport/lifecycle line.
+4. Treat the baseline as the required safety net before repo reorg or packaging work.
+5. The next stage after this one should be repo reorganization, not new transport/lifecycle work.
 
 ## Quick Resume Checklist
 
 1. Open `STRATEGIC_PLAN.md`
-2. Open this file
-3. Open `STRATEGIC_PLAN.md`
+2. Open `BASELINE.md`
+3. Open this file
 4. Run:
 
 ```powershell
-python -m pytest -q --basetemp C:\Users\vboxuser\Desktop\pytest_manual_root
-python -m mypy
+python scripts\run_baseline.py
 git status --short
 ```
