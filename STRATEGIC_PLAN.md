@@ -22,6 +22,8 @@ The immediate follow-up to that soft deprecation is host-side removal prep:
 
 - keep `file` available only through explicit host-side legacy seams
 - isolate the host-side file implementation into removable legacy-focused modules
+- keep the primary transport facade free of file-specific implementation exports
+- keep runtime transport selection centered on a dedicated primary builder, with file only behind explicit legacy opt-in
 - preserve the current file path inside `PERSISTENT_SESSION.py`
 - make eventual host-side file transport removal a mechanical follow-on step rather than a redesign
 

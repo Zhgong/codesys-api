@@ -35,6 +35,8 @@ The active prep work is host-side only:
 
 - keep `file` behind explicit legacy builders, config helpers, and legacy baseline tests
 - isolate the host-side file transport implementation so later removal is mechanical
+- keep the main host-side transport facade free of file-specific implementation exports
+- keep runtime transport selection on a primary-builder path, with file only behind explicit legacy opt-in
 - keep default diagnostics and default acceptance centered on `named_pipe`
 - do not yet change the file transport path inside `PERSISTENT_SESSION.py`
 

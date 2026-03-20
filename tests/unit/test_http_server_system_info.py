@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, cast
 
 import HTTP_SERVER
-from HTTP_SERVER import build_system_info
+from HTTP_SERVER import build_runtime_transport, build_system_info
 
 
 class FakeProcessManager:
@@ -84,3 +84,52 @@ def test_build_system_info_reports_file_as_legacy(monkeypatch: Any) -> None:
     assert info["transport_role"] == "legacy_fallback"
     assert info["transport_legacy"] is True
     assert info["recommended_transport"] == "named_pipe"
+
+
+def test_build_runtime_transport_uses_primary_builder_by_default(monkeypatch: Any, tmp_path: Any) -> None:
+    class FakeConfig:
+        transport_name = "named_pipe"
+        transport_requires_explicit_opt_in = False
+        request_dir = tmp_path / "requests"
+        result_dir = tmp_path / "results"
+        pipe_name = "codesys_api_test_pipe"
+
+    sentinel = object()
+
+    monkeypatch.setattr(HTTP_SERVER, "APP_CONFIG", FakeConfig())
+    monkeypatch.setattr(HTTP_SERVER, "build_primary_script_transport", lambda **kwargs: sentinel)
+    monkeypatch.setattr(
+        HTTP_SERVER,
+        "build_legacy_file_transport",
+        lambda **kwargs: (_ for _ in ()).throw(AssertionError("legacy builder should not be used")),
+    )
+
+    transport = build_runtime_transport()
+
+    assert transport is sentinel
+
+
+def test_build_runtime_transport_uses_legacy_builder_only_for_explicit_opt_in(
+    monkeypatch: Any,
+    tmp_path: Any,
+) -> None:
+    class FakeConfig:
+        transport_name = "file"
+        transport_requires_explicit_opt_in = True
+        request_dir = tmp_path / "requests"
+        result_dir = tmp_path / "results"
+        pipe_name = "unused"
+
+    sentinel = object()
+
+    monkeypatch.setattr(HTTP_SERVER, "APP_CONFIG", FakeConfig())
+    monkeypatch.setattr(
+        HTTP_SERVER,
+        "build_primary_script_transport",
+        lambda **kwargs: (_ for _ in ()).throw(AssertionError("primary builder should not be used")),
+    )
+    monkeypatch.setattr(HTTP_SERVER, "build_legacy_file_transport", lambda **kwargs: sentinel)
+
+    transport = build_runtime_transport()
+
+    assert transport is sentinel

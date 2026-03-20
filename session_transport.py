@@ -4,21 +4,34 @@ import time
 from pathlib import Path
 from typing import Callable
 
-from legacy_file_transport import FileScriptTransport, build_legacy_file_transport
-from named_pipe_transport import NamedPipeScriptTransport
+import legacy_file_transport
+import named_pipe_transport
 from transport_result import TransportExecutionContext, TransportRequest
 
 __all__ = [
     "TransportRequest",
     "TransportExecutionContext",
-    "FileScriptTransport",
-    "NamedPipeScriptTransport",
-    "build_legacy_file_transport",
+    "build_primary_script_transport",
     "build_script_transport",
 ]
 
 NowFn = Callable[[], float]
 SleepFn = Callable[[float], None]
+
+
+def build_primary_script_transport(
+    *,
+    pipe_name: str,
+    now_fn: NowFn = time.time,
+    sleep_fn: SleepFn = time.sleep,
+) -> named_pipe_transport.NamedPipeScriptTransport:
+    """Build the standard named-pipe transport for the primary path."""
+
+    return named_pipe_transport.NamedPipeScriptTransport(
+        pipe_name=pipe_name,
+        now_fn=now_fn,
+        sleep_fn=sleep_fn,
+    )
 
 
 def build_script_transport(
@@ -30,11 +43,11 @@ def build_script_transport(
     pipe_name: str,
     now_fn: NowFn = time.time,
     sleep_fn: SleepFn = time.sleep,
-) -> FileScriptTransport | NamedPipeScriptTransport:
-    """Build the configured transport, preferring named pipes as the primary path."""
+) -> legacy_file_transport.FileScriptTransport | named_pipe_transport.NamedPipeScriptTransport:
+    """Compatibility transport builder; prefer build_primary_script_transport for the standard path."""
 
     if transport_name == "file":
-        return build_legacy_file_transport(
+        return legacy_file_transport.build_legacy_file_transport(
             request_dir=request_dir,
             result_dir=result_dir,
             temp_root=temp_root,
@@ -42,7 +55,7 @@ def build_script_transport(
             sleep_fn=sleep_fn,
         )
     if transport_name == "named_pipe":
-        return NamedPipeScriptTransport(
+        return build_primary_script_transport(
             pipe_name=pipe_name,
             now_fn=now_fn,
             sleep_fn=sleep_fn,

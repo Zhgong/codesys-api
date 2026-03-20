@@ -154,7 +154,7 @@ def test_build_script_transport_routes_file_through_legacy_builder(
         return legacy_transport
 
     monkeypatch.setattr(
-        session_transport,
+        legacy_file_transport,
         "build_legacy_file_transport",
         fake_build_legacy_file_transport,
     )

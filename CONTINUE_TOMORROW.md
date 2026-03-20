@@ -8,22 +8,13 @@ CODESYS acceptance.
 
 Latest checkpoint:
 
-- Commit `dea2974` landed the legacy baseline test split for `file` transport.
-- Current follow-up is host-side file-removal prep in:
+- Commit `cca2125` prepared host-side file transport removal.
+- Current follow-up is host-side file-removal prep stage 2 in:
   - `CONTINUE_TOMORROW.md`
   - `FILE_TRANSPORT_RETIREMENT.md`
-  - `HTTP_SERVER.py`
   - `STRATEGIC_PLAN.md`
-  - `codesys_e2e_policy.py`
-  - `legacy_file_transport.py`
-  - `pyproject.toml`
-  - `server_config.py`
   - `session_transport.py`
-  - `tests/integration/test_file_transport_legacy_baseline.py`
-  - `tests/unit/test_file_transport_legacy_unit.py`
-  - `tests/unit/test_http_server_system_info.py`
-  - `tests/unit/test_real_codesys_e2e_policy.py`
-  - `tests/unit/test_server_config.py`
+  - `tests/integration/test_script_executor.py`
 
 Completed so far:
 
@@ -108,6 +99,12 @@ Completed so far:
   - `session_transport.py` now routes the file branch through `build_legacy_file_transport()`
   - `legacy_file_transport.py` now contains the isolated host-side file transport implementation
   - legacy-path tests now lock the file branch behind a dedicated host-side removal seam
+- Continued host-side file-removal prep:
+  - `session_transport.py` now behaves as a primary transport facade only
+  - `session_transport.py` no longer re-exports `FileScriptTransport` or `build_legacy_file_transport()`
+  - primary transport tests now lock the facade surface so file-specific symbols stay in `legacy_file_transport.py`
+  - `HTTP_SERVER.py` runtime transport selection now defaults to `build_primary_script_transport()`
+  - `HTTP_SERVER.py` only uses the file builder when legacy transport is explicitly opted in
 - Tightened runtime recovery behavior:
   - `stop_session()` and `start_session()` now wait for state convergence in real E2E
   - fallback compile now saves and closes the project before restarting in UI mode
@@ -120,7 +117,7 @@ These commands were green at the end of the session:
 ```powershell
 python -m pytest -q
 python -m mypy
-python -m py_compile HTTP_SERVER.py action_layer.py api_key_store.py codesys_e2e_policy.py codesys_process.py server_config.py file_ipc.py server_logic.py test_server.py ironpython_script_engine.py engine_adapter.py named_pipe_transport.py session_transport.py transport_result.py tests/e2e/codesys/test_real_codesys_e2e.py tests/integration/test_file_transport_legacy_baseline.py tests/integration/test_script_executor.py tests/unit/test_file_transport_legacy_unit.py tests/unit/test_http_server_system_info.py tests/unit/test_named_pipe_transport.py tests/unit/test_real_codesys_e2e_policy.py
+python -m py_compile HTTP_SERVER.py action_layer.py api_key_store.py codesys_e2e_policy.py codesys_process.py server_config.py file_ipc.py server_logic.py test_server.py ironpython_script_engine.py engine_adapter.py legacy_file_transport.py named_pipe_transport.py session_transport.py transport_result.py tests/e2e/codesys/test_real_codesys_e2e.py tests/integration/test_file_transport_legacy_baseline.py tests/integration/test_script_executor.py tests/unit/test_file_transport_legacy_unit.py tests/unit/test_http_server_system_info.py tests/unit/test_named_pipe_transport.py tests/unit/test_real_codesys_e2e_policy.py tests/unit/test_server_config.py
 ```
 
 Expected results at handoff:
@@ -129,21 +126,12 @@ Expected results at handoff:
 - `pytest -m "codesys and not codesys_slow"`: default real acceptance entrypoint
 - `pytest -m codesys`: default full acceptance entrypoint for `named_pipe`
 - `mypy`: success with no issues in 28 source files
-- `git status --short`: currently expected to show host-side removal-prep changes in:
+- `git status --short`: currently expected to show stage-2 host-side removal-prep changes in:
   - `CONTINUE_TOMORROW.md`
-  - `FILE_TRANSPORT_RETIREMENT.md`
   - `HTTP_SERVER.py`
-  - `STRATEGIC_PLAN.md`
-  - `codesys_e2e_policy.py`
-  - `legacy_file_transport.py`
-  - `pyproject.toml`
-  - `server_config.py`
   - `session_transport.py`
-  - `tests/integration/test_file_transport_legacy_baseline.py`
-  - `tests/unit/test_file_transport_legacy_unit.py`
+  - `tests/integration/test_script_executor.py`
   - `tests/unit/test_http_server_system_info.py`
-  - `tests/unit/test_real_codesys_e2e_policy.py`
-  - `tests/unit/test_server_config.py`
 
 Verified real acceptance results:
 
@@ -169,6 +157,7 @@ Verified real acceptance results:
 - The current `file` removal criteria live in `FILE_TRANSPORT_RETIREMENT.md`.
 - Host-side removal prep is active, but `PERSISTENT_SESSION.py` still keeps the file path intact.
 - The host-side file implementation now lives in `legacy_file_transport.py`; `session_transport.py` keeps the primary transport entrypoint and the legacy branch wiring only.
+- Runtime transport selection now also separates the default primary builder from the legacy file builder.
 
 ## Next Best Steps
 
@@ -192,6 +181,7 @@ Reason:
 - The current checkpoint already includes `file` soft deprecation and retirement-readiness documentation
 - The current checkpoint also keeps file-specific coverage isolated in dedicated legacy baseline tests
 - The current follow-up is now code-level host-side removal prep, not just doc alignment
+- The current follow-up keeps shrinking the primary facade surface, not deleting file transport yet
 - CLI is still lower priority than transport reliability
 
 ## Quick Resume Checklist

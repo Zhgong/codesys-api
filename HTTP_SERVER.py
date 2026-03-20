@@ -31,8 +31,9 @@ from action_layer import ActionRequest, ActionService, ActionType
 from api_key_store import ApiKeyManager
 from codesys_process import CodesysProcessManager, ProcessManagerConfig
 from ironpython_script_engine import IronPythonScriptEngineAdapter
+from legacy_file_transport import build_legacy_file_transport
 from server_config import load_server_config
-from session_transport import build_script_transport
+from session_transport import build_primary_script_transport
 from server_logic import (
     build_default_project_path,
     build_status_payload,
@@ -90,6 +91,20 @@ def build_system_info(process_manager: Any) -> dict[str, object]:
         "recommended_transport": APP_CONFIG.recommended_transport,
         "pipe_name": PIPE_NAME,
     }
+
+
+def build_runtime_transport() -> Any:
+    """Build the active runtime transport, keeping file transport behind explicit legacy opt-in."""
+
+    if APP_CONFIG.transport_requires_explicit_opt_in:
+        return build_legacy_file_transport(
+            request_dir=APP_CONFIG.request_dir,
+            result_dir=APP_CONFIG.result_dir,
+            temp_root=Path(tempfile.gettempdir()),
+        )
+    return build_primary_script_transport(
+        pipe_name=APP_CONFIG.pipe_name,
+    )
 
 # Ensure directories exist with proper permissions
 def ensure_directory(path):
@@ -535,13 +550,7 @@ def run_server():
             pipe_name=APP_CONFIG.pipe_name,
         )
         process_manager = CodesysProcessManager(process_config, logger=logger)
-        transport = build_script_transport(
-            transport_name=APP_CONFIG.transport_name,
-            request_dir=APP_CONFIG.request_dir,
-            result_dir=APP_CONFIG.result_dir,
-            temp_root=Path(tempfile.gettempdir()),
-            pipe_name=APP_CONFIG.pipe_name,
-        )
+        transport = build_runtime_transport()
         script_executor = ScriptExecutor(transport)
         engine_adapter = IronPythonScriptEngineAdapter(
             codesys_path=Path(CODESYS_PATH),
