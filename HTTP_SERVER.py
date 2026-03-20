@@ -31,9 +31,8 @@ from action_layer import ActionRequest, ActionService, ActionType
 from api_key_store import ApiKeyManager
 from codesys_process import CodesysProcessManager, ProcessManagerConfig
 from ironpython_script_engine import IronPythonScriptEngineAdapter
-from legacy_file_transport import build_legacy_file_transport
+from runtime_transport import build_runtime_transport
 from server_config import load_server_config
-from session_transport import build_primary_script_transport
 from server_logic import (
     build_default_project_path,
     build_status_payload,
@@ -72,40 +71,20 @@ RESULT_DIR = str(APP_CONFIG.result_dir)
 TERMINATION_SIGNAL_FILE = str(APP_CONFIG.termination_signal_file)
 STATUS_FILE = str(APP_CONFIG.status_file)
 LOG_FILE = str(APP_CONFIG.log_file)
-TRANSPORT_NAME = APP_CONFIG.transport_name
-PIPE_NAME = APP_CONFIG.pipe_name
 
 
 def build_system_info(process_manager: Any) -> dict[str, object]:
     """Build the system/info payload."""
-    return {
+    info: dict[str, object] = {
         "version": "0.1",
         "process_manager": {
             "status": process_manager.is_running()
         },
         "codesys_path": CODESYS_PATH,
         "persistent_script": PERSISTENT_SCRIPT,
-        "transport": TRANSPORT_NAME,
-        "transport_role": APP_CONFIG.transport_role,
-        "transport_legacy": APP_CONFIG.transport_is_legacy,
-        "recommended_transport": APP_CONFIG.recommended_transport,
-        "pipe_name": PIPE_NAME,
     }
-
-
-def build_runtime_transport() -> Any:
-    """Build the active runtime transport, keeping file transport behind explicit legacy opt-in."""
-
-    if APP_CONFIG.transport_requires_explicit_opt_in:
-        return build_legacy_file_transport(
-            request_dir=APP_CONFIG.request_dir,
-            result_dir=APP_CONFIG.result_dir,
-            temp_root=Path(tempfile.gettempdir()),
-        )
-    return build_primary_script_transport(
-        pipe_name=APP_CONFIG.pipe_name,
-    )
-
+    info.update(APP_CONFIG.build_transport_info())
+    return info
 # Ensure directories exist with proper permissions
 def ensure_directory(path):
     """Ensure directory exists with proper permissions."""
@@ -550,7 +529,7 @@ def run_server():
             pipe_name=APP_CONFIG.pipe_name,
         )
         process_manager = CodesysProcessManager(process_config, logger=logger)
-        transport = build_runtime_transport()
+        transport = build_runtime_transport(APP_CONFIG)
         script_executor = ScriptExecutor(transport)
         engine_adapter = IronPythonScriptEngineAdapter(
             codesys_path=Path(CODESYS_PATH),
@@ -581,12 +560,9 @@ def run_server():
         
         print("Starting server on {0}:{1}".format(SERVER_HOST, SERVER_PORT))
         logger.info("Starting server on %s:%d", SERVER_HOST, SERVER_PORT)
-        if APP_CONFIG.transport_requires_explicit_opt_in:
-            logger.warning(
-                "Using explicit legacy fallback transport: %s (recommended primary: %s)",
-                APP_CONFIG.transport_name,
-                APP_CONFIG.recommended_transport,
-            )
+        transport_warning = APP_CONFIG.build_transport_startup_warning()
+        if transport_warning is not None:
+            logger.warning("%s", transport_warning)
         
         # Run server
         server.serve_forever()

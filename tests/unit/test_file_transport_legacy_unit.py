@@ -7,7 +7,6 @@ import pytest
 import session_transport
 from file_ipc import FileIpcRequestArtifacts
 from legacy_file_transport import FileScriptTransport, build_legacy_file_transport
-from session_transport import build_script_transport
 from transport_result import create_transport_execution
 
 
@@ -136,38 +135,3 @@ def test_build_legacy_file_transport_creates_file_transport(tmp_path: Path) -> N
 
     assert isinstance(transport, FileScriptTransport)
     assert transport.transport_name == "file"
-
-
-def test_build_script_transport_routes_file_through_legacy_builder(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-) -> None:
-    legacy_transport = FileScriptTransport(
-        request_dir=tmp_path / "requests",
-        result_dir=tmp_path / "results",
-        temp_root=tmp_path / "temp",
-    )
-    called: dict[str, object] = {}
-
-    def fake_build_legacy_file_transport(**kwargs: object) -> FileScriptTransport:
-        called.update(kwargs)
-        return legacy_transport
-
-    monkeypatch.setattr(
-        legacy_file_transport,
-        "build_legacy_file_transport",
-        fake_build_legacy_file_transport,
-    )
-
-    transport = build_script_transport(
-        transport_name="file",
-        request_dir=tmp_path / "requests",
-        result_dir=tmp_path / "results",
-        temp_root=tmp_path / "temp",
-        pipe_name="unused",
-    )
-
-    assert transport is legacy_transport
-    assert called["request_dir"] == tmp_path / "requests"
-    assert called["result_dir"] == tmp_path / "results"
-    assert called["temp_root"] == tmp_path / "temp"

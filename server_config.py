@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 
 DEFAULT_SERVER_HOST = "0.0.0.0"
@@ -42,6 +43,10 @@ class ServerConfig:
         return self.transport_name == DEFAULT_TRANSPORT
 
     @property
+    def transport_is_supported(self) -> bool:
+        return self.transport_is_primary or self.transport_is_legacy
+
+    @property
     def transport_requires_explicit_opt_in(self) -> bool:
         return self.transport_is_legacy
 
@@ -54,6 +59,23 @@ class ServerConfig:
     @property
     def recommended_transport(self) -> str:
         return DEFAULT_TRANSPORT
+
+    def build_transport_info(self) -> dict[str, Any]:
+        return {
+            "transport": self.transport_name,
+            "transport_role": self.transport_role,
+            "transport_legacy": self.transport_is_legacy,
+            "recommended_transport": self.recommended_transport,
+            "pipe_name": self.pipe_name,
+        }
+
+    def build_transport_startup_warning(self) -> str | None:
+        if not self.transport_requires_explicit_opt_in:
+            return None
+        return "Using explicit legacy fallback transport: {0} (recommended primary: {1})".format(
+            self.transport_name,
+            self.recommended_transport,
+        )
 
 
 def _profile_name_from_path(profile_path: Path) -> str:

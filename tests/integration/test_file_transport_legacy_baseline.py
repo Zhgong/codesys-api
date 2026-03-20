@@ -8,7 +8,6 @@ from typing import Any, cast
 
 from HTTP_SERVER import ScriptExecutor
 from legacy_file_transport import FileScriptTransport, build_legacy_file_transport
-from session_transport import build_script_transport
 
 
 def wait_for_request_file(request_dir: Path) -> Path:
@@ -92,15 +91,3 @@ def test_build_legacy_file_transport_creates_legacy_file_transport(tmp_path: Pat
     assert isinstance(transport, FileScriptTransport)
     assert transport.transport_name == "file"
 
-
-def test_build_script_transport_still_supports_legacy_file_branch(tmp_path: Path) -> None:
-    transport = build_script_transport(
-        transport_name="file",
-        request_dir=tmp_path / "requests",
-        result_dir=tmp_path / "results",
-        temp_root=tmp_path / "temp",
-        pipe_name="unused",
-    )
-
-    assert isinstance(transport, FileScriptTransport)
-    assert transport.transport_name == "file"

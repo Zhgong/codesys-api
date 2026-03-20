@@ -24,8 +24,15 @@ The immediate follow-up to that soft deprecation is host-side removal prep:
 - isolate the host-side file implementation into removable legacy-focused modules
 - keep the primary transport facade free of file-specific implementation exports
 - keep runtime transport selection centered on a dedicated primary builder, with file only behind explicit legacy opt-in
+- keep compatibility entry into file transport outside the primary transport facade
+- remove compatibility builders from the primary facade once runtime and legacy baselines no longer depend on them
+- keep runtime transport selection out of `HTTP_SERVER.py` so host-side file removal stays localized
+- keep transport metadata assembly out of `HTTP_SERVER.py` so primary/legacy semantics stay centralized
+- keep transport startup warning semantics out of `HTTP_SERVER.py` so legacy messaging stays centralized
 - preserve the current file path inside `PERSISTENT_SESSION.py`
 - make eventual host-side file transport removal a mechanical follow-on step rather than a redesign
+
+That host-side removal prep is effectively complete once the current checkpoint is landed. The next transport decision point is no longer "more prep," but whether host-side file transport should enter a true removal-candidate phase.
 
 ## Target Architecture
 
@@ -341,7 +348,7 @@ The migration is considered healthy only if:
 ## Immediate Next Steps
 
 1. Continue transport soft deprecation with `named_pipe` as the only recommended path
-2. Continue host-side removal prep while keeping `file` only as an explicit legacy fallback and minimal compatibility baseline
-3. Measure the current transport state against `FILE_TRANSPORT_RETIREMENT.md` before any actual removal work
+2. Measure the current transport state against `FILE_TRANSPORT_RETIREMENT.md` and decide whether host-side file transport should enter a true removal-candidate phase
+3. Keep `file` only as an explicit legacy fallback and minimal compatibility baseline until that decision is made
 4. Keep default real acceptance centered on `named_pipe`; run `file` only for legacy baseline and compatibility checks
 5. Decide between `file` removal prep and CLI only after the transport stage remains stable under this softer deprecation model

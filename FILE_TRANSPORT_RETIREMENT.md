@@ -37,6 +37,11 @@ The active prep work is host-side only:
 - isolate the host-side file transport implementation so later removal is mechanical
 - keep the main host-side transport facade free of file-specific implementation exports
 - keep runtime transport selection on a primary-builder path, with file only behind explicit legacy opt-in
+- keep legacy file transport entry out of the primary compatibility builder entirely
+- keep unsupported transport names failing fast instead of silently falling back to the primary path
+- keep `HTTP_SERVER.py` free of direct legacy-vs-primary transport wiring where practical
+- keep `HTTP_SERVER.py` free of direct transport metadata assembly where practical
+- keep `HTTP_SERVER.py` free of direct legacy transport warning text where practical
 - keep default diagnostics and default acceptance centered on `named_pipe`
 - do not yet change the file transport path inside `PERSISTENT_SESSION.py`
 
@@ -49,3 +54,13 @@ should be a separate, explicit removal plan that:
 - reduces host-side file transport code to migration-only stubs or deletes it
 - removes file-based real E2E baselines
 - keeps one final regression checkpoint before actual deletion
+
+## Current Phase Status
+
+The current host-side prep phase is intended to end once:
+
+- primary transport selection, transport metadata, and startup warning semantics are all outside `HTTP_SERVER.py`
+- file transport enters host-side runtime only through explicit legacy seams
+- the main host-side transport facade no longer exposes file compatibility helpers
+
+After that point, the next stage should be a removal-candidate decision, not more prep refinement.
