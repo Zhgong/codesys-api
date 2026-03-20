@@ -18,7 +18,7 @@ def test_load_server_config_uses_current_repo_defaults(tmp_path: Path) -> None:
     assert config.transport_is_legacy is False
     assert config.transport_is_primary is True
     assert config.transport_is_supported is True
-    assert config.transport_requires_explicit_opt_in is False
+    assert config.transport_is_removal_candidate is False
     assert config.transport_role == "primary"
     assert config.recommended_transport == "named_pipe"
     assert config.pipe_name == "codesys_api_session"
@@ -26,18 +26,13 @@ def test_load_server_config_uses_current_repo_defaults(tmp_path: Path) -> None:
         "transport": "named_pipe",
         "transport_role": "primary",
         "transport_legacy": False,
+        "transport_removal_candidate": False,
         "recommended_transport": "named_pipe",
         "pipe_name": "codesys_api_session",
     }
-    assert config.build_transport_startup_warning() is None
     assert config.script_dir == tmp_path
     assert config.persistent_script == tmp_path / "PERSISTENT_SESSION.py"
     assert config.api_key_file == tmp_path / "api_keys.json"
-    assert config.request_dir == tmp_path / "requests"
-    assert config.result_dir == tmp_path / "results"
-    assert config.termination_signal_file == tmp_path / "terminate.signal"
-    assert config.status_file == tmp_path / "session_status.json"
-    assert config.log_file == tmp_path / "session.log"
     assert config.script_lib_dir == tmp_path / "ScriptLib"
 
 
@@ -64,22 +59,19 @@ def test_load_server_config_accepts_environment_overrides(tmp_path: Path) -> Non
     assert config.transport_name == "file"
     assert config.transport_is_legacy is True
     assert config.transport_is_primary is False
-    assert config.transport_is_supported is True
-    assert config.transport_requires_explicit_opt_in is True
-    assert config.transport_role == "legacy_fallback"
+    assert config.transport_is_supported is False
+    assert config.transport_is_removal_candidate is True
+    assert config.transport_role == "unsupported_removal_candidate"
     assert config.recommended_transport == "named_pipe"
     assert config.pipe_name == "codesys_api_test_pipe"
     assert config.build_transport_info() == {
         "transport": "file",
-        "transport_role": "legacy_fallback",
+        "transport_role": "unsupported_removal_candidate",
         "transport_legacy": True,
+        "transport_removal_candidate": True,
         "recommended_transport": "named_pipe",
         "pipe_name": "codesys_api_test_pipe",
     }
-    assert config.build_transport_startup_warning() == (
-        "Using explicit legacy fallback transport: file "
-        "(recommended primary: named_pipe)"
-    )
 
 
 def test_load_server_config_marks_unknown_transport_as_unsupported(tmp_path: Path) -> None:
@@ -94,9 +86,9 @@ def test_load_server_config_marks_unknown_transport_as_unsupported(tmp_path: Pat
     assert config.transport_is_primary is False
     assert config.transport_is_legacy is False
     assert config.transport_is_supported is False
-    assert config.transport_requires_explicit_opt_in is False
+    assert config.transport_is_removal_candidate is False
+    assert config.transport_role == "unsupported"
     assert config.pipe_name == "codesys_api_session"
-    assert config.build_transport_startup_warning() is None
 
 
 def test_load_server_config_derives_profile_name_from_profile_path(tmp_path: Path) -> None:

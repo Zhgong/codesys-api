@@ -51,18 +51,8 @@ IRONPYTHON = 'Iron' in sys.version
 
 # Constants
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-REQUEST_DIR = os.path.join(SCRIPT_DIR, "requests")
-RESULT_DIR = os.path.join(SCRIPT_DIR, "results")
-TERMINATION_SIGNAL_FILE = os.path.join(SCRIPT_DIR, "terminate.signal")
-STATUS_FILE = os.path.join(SCRIPT_DIR, "session_status.json")
-LOG_FILE = os.path.join(SCRIPT_DIR, "session.log")
 TRANSPORT_NAME = os.environ.get("CODESYS_API_TRANSPORT", "named_pipe").strip().lower()
 PIPE_NAME = os.environ.get("CODESYS_API_PIPE_NAME", "codesys_api_session")
-
-# Ensure directories exist
-for directory in [REQUEST_DIR, RESULT_DIR]:
-    if not os.path.exists(directory):
-        os.makedirs(directory)
 
 class CodesysPersistentSession(object):
     """Maintains a persistent CODESYS session."""
@@ -82,31 +72,15 @@ class CodesysPersistentSession(object):
             self.log("Python version: " + sys.version)
             self.log("IronPython: " + str(IRONPYTHON))
             self.log("Script directory: " + SCRIPT_DIR)
-            self.log("Request directory: " + REQUEST_DIR)
-            self.log("Result directory: " + RESULT_DIR)
             self.log("Transport: " + TRANSPORT_NAME)
             self.log("Pipe name: " + PIPE_NAME)
             if not NAMED_PIPE_SUPPORT:
                 self.log("Named pipe import status: " + str(NAMED_PIPE_IMPORT_ERROR))
             
-            # Write early status file to indicate script has started
-            try:
-                with open(STATUS_FILE, 'w') as f:
-                    f.write(json.dumps({
-                        "state": "starting",
-                        "timestamp": time.time()
-                    }))
-                self.log("Created early status file")
-            except Exception, e:
-                self.log("Warning: Could not create early status file: " + str(e))
-            
-            # Check if directories exist and are accessible
-            for directory in [REQUEST_DIR, RESULT_DIR]:
-                if not os.path.exists(directory):
-                    self.log("Creating directory: " + directory)
-                    os.makedirs(directory)
-                else:
-                    self.log("Directory exists: " + directory)
+            if TRANSPORT_NAME != "named_pipe":
+                self.log("Unsupported transport requested in persistent session: " + str(TRANSPORT_NAME))
+                self.init_success = False
+                return False
 
             # Test if scriptengine module is available
             if 'scriptengine' not in sys.modules:
@@ -175,18 +149,8 @@ class CodesysPersistentSession(object):
                     self.log("Waiting before retry...")
                     time.sleep(1)
             
-            # Create initial status file - mark as initialized even if system creation failed
-            # since the primary requirement is that CODESYS is visible
-            self.log("Creating status file...")
-            self.update_status({
-                "state": "initialized",  # Always use 'initialized' instead of 'error'
-                "timestamp": time.time(),
-                "project": None,
-                "system_available": self.system is not None
-            })
-            
             self.init_success = True
-            if TRANSPORT_NAME == "named_pipe" and not NAMED_PIPE_SUPPORT:
+            if not NAMED_PIPE_SUPPORT:
                 self.log("Named pipe transport requested but .NET named pipe support is unavailable: " + str(NAMED_PIPE_IMPORT_ERROR))
                 self.init_success = False
                 return False
@@ -198,19 +162,6 @@ class CodesysPersistentSession(object):
         except Exception, e:
             self.log("Initialization failed: %s" % str(e))
             self.log(traceback.format_exc())
-            
-            # Try to write error to status file - but still use 'initialized' state
-            # to avoid breaking the API when CODESYS is at least visible
-            try:
-                self.update_status({
-                    "state": "initialized",  # Use 'initialized' instead of 'error'
-                    "timestamp": time.time(),
-                    "system_available": False,
-                    "error": str(e)
-                })
-            except:
-                pass
-                
             return False
             
     def run(self):
@@ -220,10 +171,7 @@ class CodesysPersistentSession(object):
             return False
             
         # Start request processing thread
-        if TRANSPORT_NAME == "named_pipe":
-            self.request_thread = threading.Thread(target=self.process_named_pipe_requests)
-        else:
-            self.request_thread = threading.Thread(target=self.process_requests)
+        self.request_thread = threading.Thread(target=self.process_named_pipe_requests)
         self.request_thread.daemon = True
         self.request_thread.start()
         
@@ -232,16 +180,6 @@ class CodesysPersistentSession(object):
             self.log("Entering main loop")
             
             while self.running:
-                # Check for termination signal
-                if os.path.exists(TERMINATION_SIGNAL_FILE):
-                    self.log("Termination signal detected")
-                    self.running = False
-                    try:
-                        os.remove(TERMINATION_SIGNAL_FILE)
-                    except:
-                        pass
-                    break
-                    
                 # Perform periodic tasks
                 self.periodic_tasks()
                 
@@ -258,30 +196,6 @@ class CodesysPersistentSession(object):
             # Cleanup
             self.cleanup()
             
-    def process_requests(self):
-        """Process script execution requests."""
-        while self.running:
-            try:
-                # Look for request files
-                for filename in os.listdir(REQUEST_DIR):
-                    if filename.endswith(".request"):
-                        request_path = os.path.join(REQUEST_DIR, filename)
-                        
-                        # Process request
-                        self.process_request(request_path)
-                        
-                        # Remove request file
-                        try:
-                            os.remove(request_path)
-                        except:
-                            pass
-            except Exception, e:
-                self.log("Error processing requests: %s" % str(e))
-                self.log(traceback.format_exc())
-                
-            # Sleep briefly
-            time.sleep(0.1)
-
     def process_named_pipe_requests(self):
         """Process script execution requests over a named pipe."""
         server = None
@@ -423,112 +337,6 @@ class CodesysPersistentSession(object):
             offset += count
         return "".join(chr(int(item)) for item in buffer)
             
-    def process_request(self, request_path):
-        """Process a single request."""
-        result_path = None
-        script_path = None
-        request_id = "unknown"
-        
-        try:
-            # Read request
-            with open(request_path, 'r') as f:
-                request_content = f.read()
-                self.log("Request content: %s" % request_content[:200])
-                request = json.loads(request_content)
-                
-            # Get script path and result path
-            script_path = request.get("script_path")
-            result_path = request.get("result_path")
-            request_id = request.get("request_id", "unknown")
-            
-            if not script_path or not result_path:
-                raise ValueError("Invalid request - missing script_path or result_path")
-                
-            # Log request with more details
-            self.log("Processing request ID: %s" % request_id)
-            self.log("Script path: %s" % script_path)
-            self.log("Result path: %s" % result_path)
-            
-            # Check if script file exists
-            if not os.path.exists(script_path):
-                self.log("Script file not found at: %s" % script_path)
-                self.log("Current directory: %s" % os.getcwd())
-                
-                # Try to list parent directory
-                try:
-                    parent_dir = os.path.dirname(script_path)
-                    if os.path.exists(parent_dir):
-                        self.log("Parent directory exists, contents: %s" % str(os.listdir(parent_dir)))
-                    else:
-                        self.log("Parent directory does not exist: %s" % parent_dir)
-                except Exception, dir_e:
-                    self.log("Error listing parent directory: %s" % str(dir_e))
-                
-                raise IOError("Script file not found: %s" % script_path)
-                
-            # Log script size
-            try:
-                script_size = os.path.getsize(script_path)
-                self.log("Script file size: %d bytes" % script_size)
-            except Exception, size_e:
-                self.log("Could not get script file size: %s" % str(size_e))
-                
-            # Execute script
-            self.log("Starting script execution...")
-            result = self.execute_script(script_path)
-            self.log("Script execution completed")
-            
-            # Add request_id to result for tracing
-            if isinstance(result, dict):
-                result["request_id"] = request_id
-            
-            # Write result - create directory if needed
-            result_dir = os.path.dirname(result_path)
-            if not os.path.exists(result_dir):
-                self.log("Creating result directory: %s" % result_dir)
-                os.makedirs(result_dir)
-            
-            self.log("Writing result to: %s" % result_path)
-            with open(result_path, 'w') as f:
-                result_json = json.dumps(result)
-                f.write(result_json)
-                self.log("Result written successfully (%d bytes)" % len(result_json))
-                
-            # Log completion
-            self.log("Request completed: %s" % request_id)
-        except Exception, e:
-            self.log("Error processing request %s: %s" % (request_id, str(e)))
-            self.log(traceback.format_exc())
-            
-            # Write error result if result_path is available
-            if result_path:
-                try:
-                    # Ensure result directory exists
-                    result_dir = os.path.dirname(result_path)
-                    if not os.path.exists(result_dir):
-                        os.makedirs(result_dir)
-                        
-                    self.log("Writing error result to: %s" % result_path)
-                    with open(result_path, 'w') as f:
-                        error_result = {
-                            "success": False,
-                            "error": str(e),
-                            "traceback": traceback.format_exc(),
-                            "request_id": request_id,
-                            "environment": {
-                                "current_dir": os.getcwd(),
-                                "script_path": script_path,
-                                "script_exists": os.path.exists(script_path) if script_path else False,
-                                "python_version": sys.version
-                            }
-                        }
-                        result_json = json.dumps(error_result)
-                        f.write(result_json)
-                        self.log("Error result written successfully (%d bytes)" % len(result_json))
-                except Exception, write_e:
-                    self.log("Error writing result file: %s" % str(write_e))
-                    self.log(traceback.format_exc())
-                    
     def execute_script(self, script_path):
         """Execute a Python script in the CODESYS environment."""
         try:
@@ -638,19 +446,7 @@ class CodesysPersistentSession(object):
             
     def periodic_tasks(self):
         """Perform periodic tasks."""
-        # Update session status
-        project_path = None
-        if self.active_project:
-            try:
-                project_path = self.active_project.path
-            except:
-                project_path = "Unknown"
-                
-        self.update_status({
-            "state": "running",
-            "timestamp": time.time(),
-            "project": project_path
-        })
+        pass
         
     def cleanup(self):
         """Clean up resources before termination."""
@@ -670,34 +466,14 @@ class CodesysPersistentSession(object):
             except Exception, e:
                 self.log("Error closing project: %s" % str(e))
                 
-        # Update status
-        self.update_status({
-            "state": "terminated",
-            "timestamp": time.time(),
-            "project": None
-        })
-        
         self.log("Cleanup complete")
-        
-    def update_status(self, status):
-        """Update session status file."""
-        try:
-            with open(STATUS_FILE, 'w') as f:
-                f.write(json.dumps(status))
-        except Exception, e:
-            self.log("Error updating status: %s" % str(e))
             
     def log(self, message):
         """Log a message."""
         timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
         log_message = "[%s] %s\n" % (timestamp, message)
-        
-        try:
-            with open(LOG_FILE, 'a') as f:
-                f.write(log_message)
-        except:
-            # Fall back to stdout if log file is not accessible
-            print log_message
+        sys.stdout.write(log_message)
+        sys.stdout.flush()
             
 # Main entry point
 if __name__ == "__main__":

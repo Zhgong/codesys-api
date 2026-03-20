@@ -27,12 +27,11 @@ import traceback
 from pathlib import Path
 from typing import Any
 
-from action_layer import ActionRequest, ActionService, ActionType
+from action_layer import ActionRequest, ActionType
+from app_runtime import build_app_runtime
 from api_key_store import ApiKeyManager
-from codesys_process import CodesysProcessManager, ProcessManagerConfig
-from ironpython_script_engine import IronPythonScriptEngineAdapter
-from runtime_transport import build_runtime_transport
 from server_config import load_server_config
+from script_executor import ScriptExecutor
 from server_logic import (
     build_default_project_path,
     build_status_payload,
@@ -66,11 +65,6 @@ CODESYS_PATH = str(APP_CONFIG.codesys_path)
 SCRIPT_DIR = str(APP_CONFIG.script_dir)
 PERSISTENT_SCRIPT = str(APP_CONFIG.persistent_script)
 API_KEY_FILE = str(APP_CONFIG.api_key_file)
-REQUEST_DIR = str(APP_CONFIG.request_dir)
-RESULT_DIR = str(APP_CONFIG.result_dir)
-TERMINATION_SIGNAL_FILE = str(APP_CONFIG.termination_signal_file)
-STATUS_FILE = str(APP_CONFIG.status_file)
-LOG_FILE = str(APP_CONFIG.log_file)
 
 
 def build_system_info(process_manager: Any) -> dict[str, object]:
@@ -85,6 +79,14 @@ def build_system_info(process_manager: Any) -> dict[str, object]:
     }
     info.update(APP_CONFIG.build_transport_info())
     return info
+
+
+def build_system_logs(process_manager: Any) -> dict[str, object]:
+    logs = process_manager.get_log_lines() if process_manager is not None else []
+    return {
+        "success": True,
+        "logs": logs,
+    }
 # Ensure directories exist with proper permissions
 def ensure_directory(path):
     """Ensure directory exists with proper permissions."""
@@ -104,48 +106,8 @@ def ensure_directory(path):
     return path
 
 # Create necessary directories
-ensure_directory(REQUEST_DIR)
-ensure_directory(RESULT_DIR)
 temp_dir = tempfile.gettempdir()
 ensure_directory(temp_dir)
-class ScriptExecutor:
-    """Executes scripts through the CODESYS persistent session."""
-    
-    def __init__(self, transport: Any):
-        self.transport = transport
-        
-    def execute_script(self, script_content, timeout=60):
-        """Execute a script and return the result.
-        
-        Args:
-            script_content (str): The script content to execute
-            timeout (int): Timeout in seconds (default: 60 seconds)
-            
-        Returns:
-            dict: The result of the script execution
-        """
-        try:
-            # Log script execution start with more info
-            request_id = str(uuid.uuid4())
-            logger.info("Executing script (request ID: %s, timeout: %s seconds)", request_id, timeout)
-            script_preview = script_content[:500].replace('\n', ' ')
-            logger.info("Script preview: %s...", script_preview)
-            result = self.transport.execute_script(script_content, timeout=timeout)
-            if result.get('success', False):
-                logger.info("Script execution successful")
-            else:
-                logger.warning(
-                    "Script execution failed via transport=%s stage=%s retryable=%s: %s",
-                    result.get('transport', getattr(self.transport, 'transport_name', 'unknown')),
-                    result.get('error_stage', 'unknown'),
-                    result.get('retryable', 'n/a'),
-                    result.get('error', 'Unknown error'),
-                )
-            return result
-        except Exception as e:
-            logger.error("Error executing script: %s", str(e))
-            logger.error(traceback.format_exc())
-            return {"success": False, "error": str(e)}
 
 class CodesysApiHandler(BaseHTTPRequestHandler):
     """HTTP request handler for CODESYS API."""
@@ -496,54 +458,18 @@ class CodesysApiHandler(BaseHTTPRequestHandler):
         
     def handle_system_logs(self):
         """Handle system/logs endpoint."""
-        logs = []
-        
-        if os.path.exists(LOG_FILE):
-            try:
-                with open(LOG_FILE, 'r') as f:
-                    logs = f.readlines()
-            except:
-                pass
-                
-        self.send_json_response({
-            "success": True,
-            "logs": logs
-        })
+        self.send_json_response(build_system_logs(self.process_manager))
 
 
 def run_server():
     """Run the HTTP server."""
     try:
-        # Create managers
-        process_config = ProcessManagerConfig(
-            codesys_path=Path(CODESYS_PATH),
-            script_path=Path(PERSISTENT_SCRIPT),
-            status_file=Path(STATUS_FILE),
-            termination_signal_file=Path(TERMINATION_SIGNAL_FILE),
-            log_file=Path(LOG_FILE),
-            script_lib_dir=Path(SCRIPT_DIR) / "ScriptLib",
-            profile_name=APP_CONFIG.codesys_profile_name,
-            profile_path=APP_CONFIG.codesys_profile_path,
-            no_ui=APP_CONFIG.codesys_no_ui,
-            transport_name=APP_CONFIG.transport_name,
-            pipe_name=APP_CONFIG.pipe_name,
-        )
-        process_manager = CodesysProcessManager(process_config, logger=logger)
-        transport = build_runtime_transport(APP_CONFIG)
-        script_executor = ScriptExecutor(transport)
-        engine_adapter = IronPythonScriptEngineAdapter(
-            codesys_path=Path(CODESYS_PATH),
-            logger=logger,
-        )
+        runtime = build_app_runtime(APP_CONFIG, logger=logger)
+        process_manager = runtime.process_manager
+        script_executor = runtime.script_executor
+        engine_adapter = runtime.engine_adapter
         api_key_manager = ApiKeyManager(Path(API_KEY_FILE))
-        actions_service = ActionService(
-            process_manager=process_manager,
-            script_executor=script_executor,
-            engine_adapter=engine_adapter,
-            logger=logger,
-            now_fn=time.time,
-            script_dir=Path(SCRIPT_DIR),
-        )
+        actions_service = runtime.actions_service
         
         # Create server
         def handler(*args):
@@ -560,9 +486,6 @@ def run_server():
         
         print("Starting server on {0}:{1}".format(SERVER_HOST, SERVER_PORT))
         logger.info("Starting server on %s:%d", SERVER_HOST, SERVER_PORT)
-        transport_warning = APP_CONFIG.build_transport_startup_warning()
-        if transport_warning is not None:
-            logger.warning("%s", transport_warning)
         
         # Run server
         server.serve_forever()

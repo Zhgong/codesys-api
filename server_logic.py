@@ -7,6 +7,10 @@ from typing import Any, Final, TypedDict, cast
 
 CODE_FIELDS: Final[tuple[str, ...]] = ("code", "declaration", "implementation")
 DEFAULT_PROJECT_PREFIX: Final[str] = "CODESYS_Project_"
+DEFAULT_DEVICE_NAME: Final[str] = "CODESYS Control Win V3 x64"
+DEFAULT_DEVICE_TYPE: Final[int] = 4096
+DEFAULT_DEVICE_ID: Final[str] = "0000 0004"
+DEFAULT_DEVICE_VERSION: Final[str] = "3.5.20.50"
 
 
 class ProcessStatusPayload(TypedDict):
@@ -43,6 +47,11 @@ def normalize_project_create_params(
         normalized["path"] = build_default_project_path(script_dir, timestamp)
     else:
         normalized["path"] = raw_path.replace("/", "\\")
+
+    normalized.setdefault("device_name", DEFAULT_DEVICE_NAME)
+    normalized.setdefault("device_type", DEFAULT_DEVICE_TYPE)
+    normalized.setdefault("device_id", DEFAULT_DEVICE_ID)
+    normalized.setdefault("device_version", DEFAULT_DEVICE_VERSION)
 
     return normalized
 

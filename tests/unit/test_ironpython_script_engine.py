@@ -30,6 +30,18 @@ def test_project_create_script_contains_template_and_codesys_path() -> None:
     assert "scriptengine.projects.open" in script
     assert "Templates" in script
     assert r"C:\\Program Files\\CODESYS\\CODESYS\\Common\\CODESYS.exe" in script
+    assert 'desired_device_name = "CODESYS Control Win V3 x64"' in script
+    assert 'desired_device_type = 4096' in script
+    assert 'desired_device_id = "0000 0004"' in script
+    assert 'desired_device_version = "3.5.20.50"' in script
+    assert 'desired_program_name = "PLC_PRG"' in script
+    assert 'desired_task_name = "MainTask"' in script
+    assert "project.add(desired_device_name, desired_device_type, desired_device_id, desired_device_version)" in script
+    assert "app.create_task_configuration()" in script
+    assert 'task_config.create_task(desired_task_name)' in script
+    assert 'task_pous.add(desired_program_name)' in script
+    assert 'session.created_pous[desired_program_name] = existing_program' in script
+    assert "device.remove()" in script
 
 
 def test_project_open_script_uses_global_projects_instance() -> None:
@@ -80,7 +92,13 @@ def test_project_compile_script_uses_session_system_for_messages() -> None:
     script = adapter.build_execution("project.compile", {"clean_build": False}).script
 
     assert "system = session.system" in script
+    assert "application.generate_code()" in script
     assert "system.get_messages()" in script
+    assert "system.get_message_categories(True)" in script
+    assert "system.clear_messages(category)" in script
+    assert 'script_message_category = "{194B48A9-AB51-43ae-B9A9-51D3EDAADDF3}".lower()' in script
+    assert "message_counts" in script
+    assert 'entry["prefix"] = str(prefix)' in script
 
 
 def test_adapter_reports_engine_name() -> None:
@@ -115,6 +133,7 @@ def test_build_execution_returns_project_compile_script_and_default_timeout() ->
 
     assert execution.timeout == 120
     assert "Starting project compilation script" in execution.script
+    assert '"build_type": "rebuild+generate_code" if clean_build else "build+generate_code"' in execution.script
 
 
 def test_build_execution_returns_raw_script_for_script_execute() -> None:
@@ -136,3 +155,53 @@ def test_normalize_result_marks_missing_success_as_failure() -> None:
         "success": False,
         "error": "Engine result missing success flag for action: project.create",
     }
+
+
+def test_normalize_compile_result_adds_message_counts() -> None:
+    adapter = make_adapter()
+
+    result = adapter.normalize_result(
+        "project.compile",
+        {
+            "success": True,
+            "messages": [
+                {"text": "build ok", "level": "info"},
+                {"text": "careful", "level": "warning"},
+            ],
+        },
+    )
+
+    assert result["success"] is True
+    assert result["message_counts"] == {"errors": 0, "warnings": 1, "infos": 1}
+
+
+def test_normalize_compile_result_turns_error_messages_into_failure() -> None:
+    adapter = make_adapter()
+
+    result = adapter.normalize_result(
+        "project.compile",
+        {
+            "success": True,
+            "messages": [{"text": "undeclared identifier", "level": "error"}],
+        },
+    )
+
+    assert result["success"] is False
+    assert result["error"] == "Compilation completed with errors"
+    assert result["message_counts"] == {"errors": 1, "warnings": 0, "infos": 0}
+
+
+def test_normalize_compile_result_preserves_explicit_message_counts() -> None:
+    adapter = make_adapter()
+
+    result = adapter.normalize_result(
+        "project.compile",
+        {
+            "success": True,
+            "messages": [{"text": "ignored fallback", "level": "info"}],
+            "message_counts": {"errors": 2, "warnings": 3, "infos": 4},
+        },
+    )
+
+    assert result["success"] is False
+    assert result["message_counts"] == {"errors": 2, "warnings": 3, "infos": 4}

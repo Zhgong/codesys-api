@@ -6,8 +6,6 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-from file_ipc import build_timeout_result
-
 
 NowFn = Callable[[], float]
 RequestIdFactory = Callable[[], str]
@@ -157,11 +155,10 @@ def build_timeout_transport_error(
     elapsed_seconds: float,
     request_id: str | None = None,
 ) -> dict[str, Any]:
-    timeout_result = build_timeout_result(elapsed_seconds)
     return build_transport_error(
         transport=transport,
         stage="timeout",
-        error=str(timeout_result["error"]),
+        error="Script execution timed out after {:.2f} seconds".format(elapsed_seconds),
         request_id=request_id,
         timeout=True,
     )

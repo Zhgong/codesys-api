@@ -67,6 +67,9 @@ class IronPythonScriptEngineAdapter:
         raise ValueError("Unsupported action for engine adapter: {0}".format(action))
 
     def normalize_result(self, action: str, raw_result: dict[str, Any]) -> dict[str, object]:
+        if action == "project.compile":
+            return self._normalize_project_compile_result(raw_result)
+
         normalized = dict(raw_result)
         if "success" not in normalized:
             normalized["success"] = False
@@ -74,6 +77,47 @@ class IronPythonScriptEngineAdapter:
         if normalized.get("success") is False and "error" not in normalized:
             normalized["error"] = "Engine action failed: {0}".format(action)
         return normalized
+
+    def _normalize_project_compile_result(self, raw_result: dict[str, Any]) -> dict[str, object]:
+        normalized = dict(raw_result)
+        counts = self._normalize_message_counts(normalized.get("message_counts"))
+        if counts is None:
+            counts = self._count_messages(normalized.get("messages"))
+        normalized["message_counts"] = counts
+
+        if "success" not in normalized:
+            normalized["success"] = counts["errors"] == 0
+        if counts["errors"] > 0:
+            normalized["success"] = False
+            normalized.setdefault("error", "Compilation completed with errors")
+        elif normalized.get("success") is False and "error" not in normalized:
+            normalized["error"] = "Compilation failed"
+        return normalized
+
+    def _normalize_message_counts(self, counts: object) -> dict[str, int] | None:
+        if not isinstance(counts, dict):
+            return None
+        normalized: dict[str, int] = {}
+        for key in ("errors", "warnings", "infos"):
+            value = counts.get(key, 0)
+            normalized[key] = value if isinstance(value, int) else 0
+        return normalized
+
+    def _count_messages(self, messages: object) -> dict[str, int]:
+        counts = {"errors": 0, "warnings": 0, "infos": 0}
+        if not isinstance(messages, list):
+            return counts
+        for message in messages:
+            if not isinstance(message, dict):
+                continue
+            level = message.get("level")
+            if level == "error":
+                counts["errors"] += 1
+            elif level == "warning":
+                counts["warnings"] += 1
+            else:
+                counts["infos"] += 1
+        return counts
 
     def _generate_session_start_script(self) -> str:
         return """
@@ -130,6 +174,11 @@ except Exception as e:
 
     def _generate_project_create_script(self, params: dict[str, object]) -> str:
         path = str(params.get("path", "")).replace("/", "\\")
+        device_name = str(params.get("device_name", "CODESYS Control Win V3 x64"))
+        raw_device_type = params.get("device_type", 4096)
+        device_type = raw_device_type if isinstance(raw_device_type, int) else 4096
+        device_id = str(params.get("device_id", "0000 0004"))
+        device_version = str(params.get("device_version", "3.5.20.50"))
 
         template_path = str(params.get("template_path", ""))
         if not template_path:
@@ -196,7 +245,70 @@ try:
     else:
         print("Project has no save_as method")
         raise Exception("Project object does not have a save_as method")
-    
+
+    desired_device_name = "{3}"
+    desired_device_type = {4}
+    desired_device_id = "{5}"
+    desired_device_version = "{6}"
+    desired_program_name = "PLC_PRG"
+    desired_task_name = "MainTask"
+    print("Ensuring desired device exists: " + desired_device_name)
+
+    top_level_objects = []
+    if hasattr(project, 'get_children'):
+        top_level_objects = project.get_children()
+
+    existing_devices = []
+    desired_device_found = False
+    for child in top_level_objects:
+        try:
+            if hasattr(child, 'is_device') and child.is_device:
+                existing_devices.append(child)
+                child_name = child.get_name(False) if hasattr(child, 'get_name') else str(child)
+                print("Found top-level device: " + str(child_name))
+                if str(child_name) == desired_device_name:
+                    desired_device_found = True
+        except Exception as child_e:
+            print("Warning: failed to inspect top-level object: " + str(child_e))
+
+    if not desired_device_found:
+        print("Desired device not found, removing existing top-level devices")
+        for device in existing_devices:
+            try:
+                if hasattr(device, 'remove'):
+                    device.remove()
+                    print("Removed existing device")
+            except Exception as remove_e:
+                print("Warning: failed to remove existing device: " + str(remove_e))
+
+        print("Adding desired device")
+        if hasattr(project, 'add'):
+            project.add(desired_device_name, desired_device_type, desired_device_id, desired_device_version)
+        else:
+            raise Exception("Project object does not support adding devices")
+
+    desired_application = None
+    all_objects = []
+    if hasattr(project, 'get_children'):
+        all_objects = project.get_children(True)
+    for obj in all_objects:
+        try:
+            if hasattr(obj, 'is_application') and obj.is_application:
+                parent_name = ""
+                if hasattr(obj, 'parent') and obj.parent is not None and hasattr(obj.parent, 'get_name'):
+                    parent_name = str(obj.parent.get_name(False))
+                if parent_name == desired_device_name or desired_application is None:
+                    desired_application = obj
+        except Exception as app_e:
+            print("Warning: failed to inspect application candidate: " + str(app_e))
+
+    if desired_application is not None and hasattr(project, 'active_application'):
+        try:
+            project.active_application = desired_application
+            print("Set desired active application")
+        except Exception as active_e:
+            print("Warning: failed to set desired active application: " + str(active_e))
+
     print("Setting as active project")
     session.active_project = project
     
@@ -206,6 +318,100 @@ try:
         print("Found active application: " + str(app))
     else:
         print("No active application found in project")
+        raise Exception("Project does not contain an active application for the requested SoftPLC")
+
+    existing_program = None
+    task_config = None
+    existing_task = None
+    app_children = []
+    if hasattr(app, 'get_children'):
+        try:
+            app_children = app.get_children(True)
+        except Exception as child_scan_e:
+            print("Warning: failed to enumerate application children: " + str(child_scan_e))
+
+    for child in app_children:
+        try:
+            child_name = child.get_name(False) if hasattr(child, 'get_name') else ""
+            if str(child_name) == desired_program_name:
+                existing_program = child
+            if hasattr(child, 'is_task_configuration') and child.is_task_configuration:
+                task_config = child
+            if hasattr(child, 'is_task') and child.is_task and str(child_name) == desired_task_name:
+                existing_task = child
+        except Exception as child_e:
+            print("Warning: failed to inspect application child: " + str(child_e))
+
+    if existing_program is None:
+        print("Creating default program: " + desired_program_name)
+        if hasattr(app, 'create_pou'):
+            existing_program = app.create_pou(
+                name=desired_program_name,
+                type=scriptengine.PouType.Program,
+                language=scriptengine.ImplementationLanguages.st
+            )
+        elif hasattr(app, 'pou_container'):
+            existing_program = app.pou_container.create_pou(
+                name=desired_program_name,
+                type=scriptengine.PouType.Program,
+                language=scriptengine.ImplementationLanguages.st
+            )
+        else:
+            raise Exception("Application does not support creating a default PLC_PRG")
+
+    if task_config is None:
+        print("Creating task configuration")
+        if hasattr(app, 'create_task_configuration'):
+            task_config = app.create_task_configuration()
+        else:
+            raise Exception("Application does not support creating task configuration")
+
+    if existing_task is None:
+        print("Creating default task: " + desired_task_name)
+        if hasattr(task_config, 'create_task'):
+            existing_task = task_config.create_task(desired_task_name)
+        else:
+            raise Exception("Task configuration object does not support creating tasks")
+
+    if hasattr(existing_task, 'kind_of_task') and hasattr(scriptengine, 'KindOfTask'):
+        try:
+            existing_task.kind_of_task = scriptengine.KindOfTask.Cyclic
+        except Exception as task_kind_e:
+            print("Warning: failed to set task kind: " + str(task_kind_e))
+    if hasattr(existing_task, 'interval'):
+        try:
+            existing_task.interval = "20"
+        except Exception as task_interval_e:
+            print("Warning: failed to set task interval: " + str(task_interval_e))
+    if hasattr(existing_task, 'interval_unit'):
+        try:
+            existing_task.interval_unit = "ms"
+        except Exception as task_unit_e:
+            print("Warning: failed to set task interval unit: " + str(task_unit_e))
+
+    if hasattr(existing_task, 'pous'):
+        try:
+            task_pous = existing_task.pous
+            task_has_program = False
+            for task_pou in task_pous:
+                try:
+                    if str(task_pou) == desired_program_name:
+                        task_has_program = True
+                        break
+                    if hasattr(task_pou, 'get_name') and str(task_pou.get_name(False)) == desired_program_name:
+                        task_has_program = True
+                        break
+                except Exception:
+                    pass
+            if not task_has_program and hasattr(task_pous, 'add'):
+                print("Assigning default program to task")
+                task_pous.add(desired_program_name)
+        except Exception as task_pou_e:
+            print("Warning: failed to assign default program to task: " + str(task_pou_e))
+
+    if not hasattr(session, 'created_pous'):
+        session.created_pous = {{}}
+    session.created_pous[desired_program_name] = existing_program
     
     print("Project creation completed")
     
@@ -226,7 +432,15 @@ except:
         "success": False,
         "error": str(error_value)
     }}
-""".format(path.replace("\\", "\\\\"), template_path.replace("\\", "\\\\"), codesys_path.replace("\\", "\\\\"))
+""".format(
+            path.replace("\\", "\\\\"),
+            template_path.replace("\\", "\\\\"),
+            codesys_path.replace("\\", "\\\\"),
+            device_name.replace("\\", "\\\\"),
+            device_type,
+            device_id.replace("\\", "\\\\"),
+            device_version.replace("\\", "\\\\"),
+        )
 
     def _generate_project_open_script(self, params: dict[str, object]) -> str:
         path = str(params.get("path", ""))
@@ -589,26 +803,88 @@ try:
     print("Starting project compilation script")
     clean_build = {0}
     print("Clean build: " + str(clean_build))
+    script_message_category = "{{194B48A9-AB51-43ae-B9A9-51D3EDAADDF3}}".lower()
+    
+    def infer_level_from_text(message_text):
+        lowered = str(message_text).lower()
+        if "fatal" in lowered or "error" in lowered:
+            return "error"
+        if "warning" in lowered:
+            return "warning"
+        return "info"
+
+    def normalize_level_from_severity(severity):
+        lowered = str(severity).lower()
+        if "fatal" in lowered or "error" in lowered:
+            return "error"
+        if "warning" in lowered:
+            return "warning"
+        return "info"
+
+    def append_message(target, text, level, prefix=None, number=None):
+        entry = {{
+            "text": str(text),
+            "level": str(level)
+        }}
+        if prefix is not None:
+            entry["prefix"] = str(prefix)
+        if number is not None:
+            try:
+                entry["number"] = int(number)
+            except Exception:
+                entry["number"] = str(number)
+        target.append(entry)
+
+    def build_message_counts(message_list):
+        counts = {{"errors": 0, "warnings": 0, "infos": 0}}
+        for message in message_list:
+            level = message.get("level")
+            if level == "error":
+                counts["errors"] += 1
+            elif level == "warning":
+                counts["warnings"] += 1
+            else:
+                counts["infos"] += 1
+        return counts
     
     if not hasattr(session, 'active_project') or session.active_project is None:
         print("No active project in session")
-        result = {{"success": False, "error": "No active project in session"}}
+        result = {{
+            "success": False,
+            "error": "No active project in session",
+            "messages": [],
+            "message_counts": {{"errors": 0, "warnings": 0, "infos": 0}}
+        }}
     else:
         project = session.active_project
         print("Got active project: " + str(project.path))
         
         if not hasattr(project, 'active_application') or project.active_application is None:
             print("Project has no active application")
-            result = {{"success": False, "error": "Project has no active application"}}
+            result = {{
+                "success": False,
+                "error": "Project has no active application",
+                "messages": [],
+                "message_counts": {{"errors": 0, "warnings": 0, "infos": 0}}
+            }}
         else:
             application = project.active_application
             print("Got active application")
             system = session.system if hasattr(session, 'system') else None
             if system is None and hasattr(scriptengine, 'system'):
                 system = scriptengine.system
-            if system is not None and hasattr(system, 'clear_messages'):
+            if (
+                system is not None
+                and hasattr(system, 'clear_messages')
+                and hasattr(system, 'get_message_categories')
+            ):
                 try:
-                    system.clear_messages()
+                    active_categories = system.get_message_categories(True)
+                    for category in active_categories:
+                        try:
+                            system.clear_messages(category)
+                        except Exception as clear_category_e:
+                            print("Warning: Could not clear category messages: " + str(clear_category_e))
                     print("Cleared previous messages")
                 except Exception as clear_e:
                     print("Warning: Could not clear messages: " + str(clear_e))
@@ -628,44 +904,76 @@ try:
                     application.build()
                 
                 print("Build command completed")
+                if hasattr(application, 'generate_code'):
+                    print("Generating code...")
+                    application.generate_code()
+                    print("Code generation completed")
+                else:
+                    raise Exception("Active application does not support generate_code")
+
+                if hasattr(system, 'delay'):
+                    try:
+                        system.delay(250)
+                    except Exception as delay_e:
+                        print("Warning: Could not delay for message flush: " + str(delay_e))
+
                 compilation_messages = []
-                if system is not None and hasattr(system, 'get_messages'):
+                if (
+                    system is not None
+                    and hasattr(system, 'get_message_categories')
+                    and hasattr(system, 'get_message_objects')
+                ):
+                    try:
+                        active_categories = system.get_message_categories(True)
+                        for category in active_categories:
+                            try:
+                                category_text = str(category).lower()
+                            except Exception:
+                                category_text = ""
+                            if category_text == script_message_category:
+                                continue
+                            try:
+                                category_description = system.get_message_category_description(category)
+                            except Exception:
+                                category_description = None
+                            message_objects = system.get_message_objects(category)
+                            print(
+                                "Retrieved "
+                                + str(len(message_objects))
+                                + " message objects from category "
+                                + str(category)
+                            )
+                            for msg_obj in message_objects:
+                                try:
+                                    msg_text = str(msg_obj)
+                                    msg_level = "info"
+                                    msg_prefix = None
+                                    msg_number = None
+                                    if hasattr(msg_obj, 'severity'):
+                                        msg_level = normalize_level_from_severity(msg_obj.severity)
+                                    if hasattr(msg_obj, 'prefix'):
+                                        msg_prefix = msg_obj.prefix
+                                    if hasattr(msg_obj, 'number'):
+                                        msg_number = msg_obj.number
+                                    append_message(compilation_messages, msg_text, msg_level, msg_prefix, msg_number)
+                                    if category_description is not None and len(compilation_messages) > 0:
+                                        compilation_messages[-1]["category"] = str(category_description)
+                                except Exception as parse_msg_e:
+                                    print("Warning: Could not parse message object: " + str(parse_msg_e))
+                    except Exception as msg_obj_e:
+                        print("Warning: Could not get compilation category messages: " + str(msg_obj_e))
+
+                if not compilation_messages and system is not None and hasattr(system, 'get_messages'):
                     try:
                         messages = system.get_messages()
-                        print("Retrieved " + str(len(messages)) + " compilation messages")
+                        print("Retrieved " + str(len(messages)) + " fallback compilation messages")
                         for msg in messages:
-                            compilation_messages.append({{
-                                "text": str(msg),
-                                "level": "info"
-                            }})
+                            append_message(compilation_messages, msg, infer_level_from_text(msg))
                     except Exception as msg_e:
-                        print("Warning: Could not get compilation messages: " + str(msg_e))
+                        print("Warning: Could not get fallback compilation messages: " + str(msg_e))
                 
-                if system is not None and hasattr(system, 'get_message_objects'):
-                    try:
-                        message_objects = system.get_message_objects()
-                        print("Retrieved " + str(len(message_objects)) + " message objects")
-                        for msg_obj in message_objects:
-                            try:
-                                msg_text = str(msg_obj)
-                                msg_level = "info"
-                                if hasattr(msg_obj, 'severity'):
-                                    severity = str(msg_obj.severity).lower()
-                                    if 'error' in severity:
-                                        msg_level = "error"
-                                    elif 'warning' in severity:
-                                        msg_level = "warning"
-                                
-                                compilation_messages.append({{
-                                    "text": msg_text,
-                                    "level": msg_level
-                                }})
-                            except Exception as parse_msg_e:
-                                print("Warning: Could not parse message object: " + str(parse_msg_e))
-                    except Exception as msg_obj_e:
-                        print("Warning: Could not get message objects: " + str(msg_obj_e))
-                
-                has_errors = any(msg.get("level") == "error" for msg in compilation_messages)
+                message_counts = build_message_counts(compilation_messages)
+                has_errors = message_counts["errors"] > 0
                 
                 if has_errors:
                     print("Compilation completed with errors")
@@ -673,15 +981,17 @@ try:
                         "success": False,
                         "error": "Compilation completed with errors",
                         "messages": compilation_messages,
-                        "build_type": "rebuild" if clean_build else "build"
+                        "message_counts": message_counts,
+                        "build_type": "rebuild+generate_code" if clean_build else "build+generate_code"
                     }}
                 else:
                     print("Compilation completed successfully")
                     result = {{
                         "success": True,
-                        "message": "Project compiled successfully",
+                        "message": "Project compiled and generated code successfully",
                         "messages": compilation_messages,
-                        "build_type": "rebuild" if clean_build else "build"
+                        "message_counts": message_counts,
+                        "build_type": "rebuild+generate_code" if clean_build else "build+generate_code"
                     }}
                     
             except Exception as build_e:
@@ -690,12 +1000,19 @@ try:
                 result = {{
                     "success": False,
                     "error": "Compilation failed: " + str(build_e),
-                    "build_type": "rebuild" if clean_build else "build"
+                    "messages": [],
+                    "message_counts": {{"errors": 1, "warnings": 0, "infos": 0}},
+                    "build_type": "rebuild+generate_code" if clean_build else "build+generate_code"
                 }}
                 
 except Exception:
     error_type, error_value, error_traceback = sys.exc_info()
     print("Error in project compilation script: " + str(error_value))
     print(traceback.format_exc())
-    result = {{"success": False, "error": str(error_value)}}
+    result = {{
+        "success": False,
+        "error": str(error_value),
+        "messages": [],
+        "message_counts": {{"errors": 1, "warnings": 0, "infos": 0}}
+    }}
 """.format("True" if clean_build else "False")

@@ -16,9 +16,8 @@ from urllib import error, request
 import pytest
 
 from codesys_e2e_policy import (
-    LEGACY_TRANSPORT,
     current_codesys_e2e_transport,
-    legacy_file_full_track_enabled,
+    current_codesys_e2e_transport_is_supported,
 )
 
 
@@ -143,14 +142,6 @@ def session_status(base_url: str) -> tuple[int, dict[str, Any]]:
     )
 
 
-def skip_if_legacy_file_full_track_not_enabled() -> None:
-    if current_codesys_e2e_transport(os.environ) == LEGACY_TRANSPORT and not legacy_file_full_track_enabled(os.environ):
-        pytest.skip(
-            "Legacy file transport only runs fast-track E2E by default; "
-            "set CODESYS_E2E_FILE_FULL=1 to run slow-track checks"
-        )
-
-
 def codesys_env() -> dict[str, str]:
     if os.environ.get("CODESYS_E2E_ENABLE") != "1":
         pytest.skip("Set CODESYS_E2E_ENABLE=1 to run real CODESYS E2E tests")
@@ -163,6 +154,9 @@ def codesys_env() -> dict[str, str]:
     missing = [name for name, value in required.items() if not value]
     if missing:
         pytest.skip(f"Missing required real CODESYS environment variables: {', '.join(missing)}")
+
+    if not current_codesys_e2e_transport_is_supported(os.environ):
+        pytest.skip("Only named_pipe real E2E transport is supported in the current host-side runtime")
 
     env = os.environ.copy()
     env["CODESYS_API_SERVER_HOST"] = "127.0.0.1"
@@ -236,11 +230,53 @@ def test_real_codesys_main_flow(real_server: tuple[str, subprocess.Popen[str]]) 
     assert status_code == 200
     assert payload["success"] is True
 
+    status_code, payload = call_json(
+        base_url,
+        "/api/v1/pou/create",
+        method="POST",
+        payload={"name": "MotorController", "type": "FunctionBlock", "language": "ST"},
+        timeout=120,
+    )
+    assert status_code == 200
+    assert payload["success"] is True
+
+    status_code, payload = call_json(
+        base_url,
+        "/api/v1/pou/code",
+        method="POST",
+        payload={
+            "path": "Application/MotorController",
+            "declaration": (
+                "FUNCTION_BLOCK MotorController\n"
+                "VAR_INPUT\n"
+                "    Enable : BOOL;\n"
+                "END_VAR\n"
+                "VAR\n"
+                "    Output : BOOL;\n"
+                "END_VAR"
+            ),
+            "implementation": "Output := Enable;",
+        },
+        timeout=120,
+    )
+    assert status_code == 200
+    assert payload["success"] is True
+
+    status_code, payload = call_json(
+        base_url,
+        "/api/v1/project/compile",
+        method="POST",
+        payload={"clean_build": False},
+        timeout=REAL_COMPILE_TIMEOUT,
+    )
+    assert status_code == 200
+    assert payload["success"] is True
+    assert payload["message_counts"]["errors"] == 0
+
 
 @pytest.mark.codesys
 @pytest.mark.codesys_slow
 def test_real_codesys_restart_keeps_session_usable(real_server: tuple[str, subprocess.Popen[str]]) -> None:
-    skip_if_legacy_file_full_track_not_enabled()
     base_url, _process = real_server
     stop_session(base_url)
     assert_session_started(base_url)
@@ -265,7 +301,6 @@ def test_real_codesys_restart_keeps_session_usable(real_server: tuple[str, subpr
 @pytest.mark.codesys
 @pytest.mark.codesys_slow
 def test_real_codesys_stop_is_repeatable(real_server: tuple[str, subprocess.Popen[str]]) -> None:
-    skip_if_legacy_file_full_track_not_enabled()
     base_url, _process = real_server
     assert_session_started(base_url)
 
@@ -281,7 +316,6 @@ def test_real_codesys_stop_is_repeatable(real_server: tuple[str, subprocess.Pope
 @pytest.mark.codesys
 @pytest.mark.codesys_slow
 def test_real_codesys_start_is_repeatable(real_server: tuple[str, subprocess.Popen[str]]) -> None:
-    skip_if_legacy_file_full_track_not_enabled()
     base_url, _process = real_server
     stop_session(base_url)
 
@@ -299,7 +333,6 @@ def test_real_codesys_start_is_repeatable(real_server: tuple[str, subprocess.Pop
 def test_real_codesys_compile_without_active_project_fails_cleanly(
     real_server: tuple[str, subprocess.Popen[str]],
 ) -> None:
-    skip_if_legacy_file_full_track_not_enabled()
     base_url, _process = real_server
     stop_session(base_url)
     assert_session_started(base_url)
@@ -326,6 +359,68 @@ def test_real_codesys_compile_without_active_project_fails_cleanly(
     )
     assert status_code == 200
     assert payload["success"] is True
+    assert payload["message_counts"]["errors"] == 0
+
+
+@pytest.mark.codesys
+@pytest.mark.codesys_slow
+def test_real_codesys_compile_detects_project_errors(
+    real_server: tuple[str, subprocess.Popen[str]],
+) -> None:
+    base_url, _process = real_server
+    stop_session(base_url)
+    assert_session_started(base_url)
+    project_path = str(Path(tempfile.gettempdir()) / f"codesys_api_compile_error_{uuid.uuid4().hex}.project")
+
+    status_code, payload = call_json(
+        base_url,
+        "/api/v1/project/create",
+        method="POST",
+        payload={"path": project_path},
+        timeout=120,
+    )
+    assert status_code == 200
+    assert payload["success"] is True
+
+    status_code, payload = call_json(
+        base_url,
+        "/api/v1/pou/create",
+        method="POST",
+        payload={"name": "BrokenController", "type": "FunctionBlock", "language": "ST"},
+        timeout=120,
+    )
+    assert status_code == 200
+    assert payload["success"] is True
+
+    status_code, payload = call_json(
+        base_url,
+        "/api/v1/pou/code",
+        method="POST",
+        payload={
+            "path": "Application/BrokenController",
+            "declaration": (
+                "FUNCTION_BLOCK BrokenController\n"
+                "VAR\n"
+                "    Output : BOOL;\n"
+                "END_VAR"
+            ),
+            "implementation": "Output := MissingVar;",
+        },
+        timeout=120,
+    )
+    assert status_code == 200
+    assert payload["success"] is True
+
+    status_code, payload = call_json(
+        base_url,
+        "/api/v1/project/compile",
+        method="POST",
+        payload={"clean_build": False},
+        timeout=REAL_COMPILE_TIMEOUT,
+    )
+    assert status_code == 500
+    assert payload["success"] is False
+    assert payload["message_counts"]["errors"] > 0
 
     status_code, payload = call_json(
         base_url,

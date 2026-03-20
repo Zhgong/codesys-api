@@ -24,6 +24,10 @@ def test_normalize_project_create_params_adds_default_path_and_preserves_templat
 
     assert params["path"] == r"C:\repo\CODESYS_Project_20260317_223000.project"
     assert params["template_path"] == r"C:\Templates\Standard.project"
+    assert params["device_name"] == "CODESYS Control Win V3 x64"
+    assert params["device_type"] == 4096
+    assert params["device_id"] == "0000 0004"
+    assert params["device_version"] == "3.5.20.50"
 
 
 def test_normalize_project_create_params_normalizes_windows_slashes() -> None:

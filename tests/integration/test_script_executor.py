@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import logging
 from typing import Any, cast
 
-from HTTP_SERVER import ScriptExecutor
 from named_pipe_transport import NamedPipeScriptTransport
 import session_transport
+import runtime_transport
 from session_transport import build_primary_script_transport
+from script_executor import ScriptExecutor
 
 
 def test_script_executor_delegates_to_transport() -> None:
@@ -17,7 +19,7 @@ def test_script_executor_delegates_to_transport() -> None:
             return {"success": True, "message": "ok"}
 
     executor_factory = cast(Any, ScriptExecutor)
-    executor = executor_factory(FakeTransport())
+    executor = executor_factory(FakeTransport(), logger=logging.getLogger("script-executor-test"))
 
     result = executor.execute_script("print('hello')", timeout=2)
 
@@ -40,5 +42,7 @@ def test_session_transport_keeps_only_primary_facade_exports() -> None:
         "TransportExecutionContext",
         "build_primary_script_transport",
     ]
-    assert not hasattr(session_transport, "FileScriptTransport")
-    assert not hasattr(session_transport, "build_legacy_file_transport")
+
+
+def test_runtime_transport_module_keeps_only_primary_runtime_builder() -> None:
+    assert not hasattr(runtime_transport, "build_legacy_file_transport")

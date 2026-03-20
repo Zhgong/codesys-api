@@ -1,16 +1,17 @@
 from __future__ import annotations
 
-import json
 import logging
 import os
 import subprocess
 import threading
 import time
+from collections import deque
 from dataclasses import dataclass
+from io import BufferedReader
 from pathlib import Path
-from typing import Any, Callable, Protocol, cast
+from typing import Any, Callable, Deque, Protocol, cast
 
-from named_pipe_transport import wait_for_named_pipe_listener
+from named_pipe_transport import NamedPipeScriptTransport, wait_for_named_pipe_listener
 
 
 class ProcessLike(Protocol):
@@ -27,6 +28,7 @@ PopenFactory = Callable[..., ProcessLike]
 SleepFn = Callable[[float], None]
 NowFn = Callable[[], float]
 PipeReadyFn = Callable[[str, float], bool]
+ShutdownRequestFn = Callable[[str, int], dict[str, object]]
 
 
 def default_popen_factory(command: str, **kwargs: Any) -> ProcessLike:
@@ -37,14 +39,11 @@ def default_popen_factory(command: str, **kwargs: Any) -> ProcessLike:
 class ProcessManagerConfig:
     codesys_path: Path
     script_path: Path
-    status_file: Path
-    termination_signal_file: Path
-    log_file: Path
     script_lib_dir: Path
     profile_name: str | None = None
     profile_path: Path | None = None
     no_ui: bool = True
-    transport_name: str = "file"
+    transport_name: str = "named_pipe"
     pipe_name: str | None = None
 
 
@@ -64,7 +63,9 @@ class CodesysProcessManager:
         stop_timeout: float = 10.0,
         stop_poll_interval: float = 0.5,
         post_terminate_wait: float = 2.0,
+        log_buffer_capacity: int = 1000,
         pipe_ready_fn: PipeReadyFn = wait_for_named_pipe_listener,
+        shutdown_request_fn: ShutdownRequestFn | None = None,
     ) -> None:
         self.config = config
         self.logger = logger
@@ -78,11 +79,16 @@ class CodesysProcessManager:
         self.stop_timeout = stop_timeout
         self.stop_poll_interval = stop_poll_interval
         self.post_terminate_wait = post_terminate_wait
+        self.log_buffer_capacity = log_buffer_capacity
         self.pipe_ready_fn = pipe_ready_fn
+        self.shutdown_request_fn = shutdown_request_fn or self._request_named_pipe_shutdown
         self.process: ProcessLike | None = None
         self.running = False
         self.lock = threading.Lock()
         self.no_ui_override: bool | None = None
+        self.log_buffer: Deque[str] = deque(maxlen=log_buffer_capacity)
+        self.log_lock = threading.Lock()
+        self.output_threads: list[threading.Thread] = []
 
     def start(self) -> bool:
         with self.lock:
@@ -102,11 +108,13 @@ class CodesysProcessManager:
                 profile_error = self._validate_profile_configuration()
                 if profile_error is not None:
                     self.logger.error(profile_error)
+                    self._record_runtime_event(profile_error)
                     return False
 
                 self.logger.info("Starting CODESYS process with script: %s", self.config.script_path)
-                self._reset_runtime_files()
-                self.config.log_file.parent.mkdir(parents=True, exist_ok=True)
+                self._record_runtime_event(
+                    "Starting CODESYS process with script: {0}".format(self.config.script_path)
+                )
 
                 try:
                     env = self._build_launch_env()
@@ -120,30 +128,26 @@ class CodesysProcessManager:
                         env=env,
                         shell=True,
                     )
+                    self._start_output_threads()
                 except subprocess.SubprocessError as exc:
                     self.logger.error("SubprocessError starting CODESYS: %s", str(exc))
+                    self._record_runtime_event("SubprocessError starting CODESYS: {0}".format(str(exc)))
                     return False
                 except FileNotFoundError:
                     self.logger.error(
                         "CODESYS executable not found. Check the path: %s",
                         self.config.codesys_path,
                     )
+                    self._record_runtime_event(
+                        "CODESYS executable not found. Check the path: {0}".format(self.config.codesys_path)
+                    )
                     return False
 
-                waited = 0.0
-                while waited < self.startup_timeout:
-                    self.sleep_fn(self.startup_poll_interval)
-                    waited += self.startup_poll_interval
-
+                if self.startup_timeout > 0 and self.startup_poll_interval > 0:
+                    self.sleep_fn(min(self.startup_timeout, self.startup_poll_interval))
                     if not self.is_running():
                         self._log_failed_start()
                         return False
-
-                    if self.config.status_file.exists():
-                        self.logger.info("Status file detected after %.1f seconds", waited)
-                        break
-
-                    self.logger.debug("Waiting for CODESYS initialization... (%.1f seconds elapsed)", waited)
 
                 self.logger.info("CODESYS process has started. Waiting for full initialization...")
                 self.logger.info(
@@ -154,15 +158,13 @@ class CodesysProcessManager:
 
                 if not self.is_running():
                     self.logger.error("CODESYS process failed to initialize properly")
+                    self._record_runtime_event("CODESYS process failed to initialize properly")
                     return False
-
-                if not self.config.status_file.exists():
-                    self.logger.warning("CODESYS started but didn't create status file. Creating a default one.")
-                    self._write_default_status("initialized")
 
                 if self.config.transport_name == "named_pipe":
                     if not self.config.pipe_name:
                         self.logger.error("Named pipe transport requires a pipe_name")
+                        self._record_runtime_event("Named pipe transport requires a pipe_name")
                         return False
                     self.logger.info("Waiting for named pipe listener: %s", self.config.pipe_name)
                     if not self.pipe_ready_fn(self.config.pipe_name, self.pipe_ready_timeout):
@@ -170,14 +172,24 @@ class CodesysProcessManager:
                             "Named pipe listener did not become ready within %.1f seconds",
                             self.pipe_ready_timeout,
                         )
+                        self._record_runtime_event(
+                            "Named pipe listener did not become ready within {0:.1f} seconds".format(
+                                self.pipe_ready_timeout
+                            )
+                        )
                         return False
                     self.logger.info("Named pipe listener is ready: %s", self.config.pipe_name)
+                    self._record_runtime_event(
+                        "Named pipe listener is ready: {0}".format(self.config.pipe_name)
+                    )
 
                 self.running = True
                 self.logger.info("CODESYS process started and fully initialized")
+                self._record_runtime_event("CODESYS process started and fully initialized")
                 return True
             except Exception as exc:
                 self.logger.error("Error starting CODESYS process: %s", str(exc))
+                self._record_runtime_event("Error starting CODESYS process: {0}".format(str(exc)))
                 return False
 
     def stop(self) -> bool:
@@ -188,7 +200,9 @@ class CodesysProcessManager:
 
             try:
                 self.logger.info("Stopping CODESYS process")
-                self._write_termination_signal()
+                self._record_runtime_event("Stopping CODESYS process")
+                if self.config.transport_name == "named_pipe" and self.config.pipe_name:
+                    self._request_graceful_shutdown()
 
                 waited = 0.0
                 while waited < self.stop_timeout:
@@ -218,28 +232,26 @@ class CodesysProcessManager:
 
                 self.process = None
                 self.running = False
-                self._remove_termination_signal()
+                self._join_output_threads()
                 self.logger.info("CODESYS process stopped successfully")
+                self._record_runtime_event("CODESYS process stopped successfully")
                 return True
             except Exception as exc:
                 self.logger.error("Error stopping CODESYS process: %s", str(exc))
+                self._record_runtime_event("Error stopping CODESYS process: {0}".format(str(exc)))
                 return False
 
     def is_running(self) -> bool:
         return self.process is not None and self.process.poll() is None
 
     def get_status(self) -> dict[str, object]:
-        try:
-            if not self.config.status_file.exists():
-                return {"state": "unknown", "timestamp": self.now_fn()}
+        if self.is_running():
+            return {"state": "running", "timestamp": self.now_fn()}
+        return {"state": "unknown", "timestamp": self.now_fn()}
 
-            payload = json.loads(self.config.status_file.read_text(encoding="utf-8"))
-            if isinstance(payload, dict):
-                return cast(dict[str, object], payload)
-            raise ValueError("Status payload must be a JSON object")
-        except Exception as exc:
-            self.logger.error("Error getting CODESYS status: %s", str(exc))
-            return {"state": "error", "timestamp": self.now_fn(), "error": str(exc)}
+    def get_log_lines(self) -> list[str]:
+        with self.log_lock:
+            return list(self.log_buffer)
 
     def is_no_ui_mode(self) -> bool:
         if self.no_ui_override is not None:
@@ -282,54 +294,102 @@ class CodesysProcessManager:
 
         return None
 
-    def _reset_runtime_files(self) -> None:
-        if self.config.termination_signal_file.exists():
-            self.config.termination_signal_file.unlink()
-
-        if self.config.status_file.exists():
-            try:
-                self.config.status_file.unlink()
-                self.logger.info("Removed existing status file")
-            except Exception as exc:
-                self.logger.warning("Could not remove existing status file: %s", str(exc))
-
-    def _write_default_status(self, state: str) -> None:
-        try:
-            self.config.status_file.write_text(
-                json.dumps({"state": state, "timestamp": self.now_fn()}),
-                encoding="utf-8",
-            )
-        except Exception as exc:
-            self.logger.error("Error creating default status file: %s", str(exc))
-
-    def _write_termination_signal(self) -> None:
-        try:
-            self.config.termination_signal_file.write_text("TERMINATE", encoding="utf-8")
-            self.logger.debug("Created termination signal file")
-        except Exception as exc:
-            self.logger.warning("Could not create termination signal file: %s", str(exc))
-
-    def _remove_termination_signal(self) -> None:
-        if not self.config.termination_signal_file.exists():
+    def _request_graceful_shutdown(self) -> None:
+        if not self.config.pipe_name:
+            self.logger.warning("Named pipe graceful shutdown requested without a pipe_name")
+            self._record_runtime_event("Named pipe graceful shutdown requested without a pipe_name")
             return
 
+        timeout = max(1, int(self.stop_timeout))
         try:
-            self.config.termination_signal_file.unlink()
+            result = self.shutdown_request_fn(self.config.pipe_name, timeout)
         except Exception as exc:
-            self.logger.warning("Could not remove termination signal file: %s", str(exc))
+            self.logger.warning("Graceful named-pipe shutdown request failed: %s", str(exc))
+            self._record_runtime_event(
+                "Graceful named-pipe shutdown request failed: {0}".format(str(exc))
+            )
+            return
+
+        if result.get("success") is True:
+            self.logger.info("Graceful named-pipe shutdown acknowledged")
+            self._record_runtime_event("Graceful named-pipe shutdown acknowledged")
+        else:
+            self.logger.warning(
+                "Graceful named-pipe shutdown request returned failure: %s",
+                result.get("error", "unknown error"),
+            )
+            self._record_runtime_event(
+                "Graceful named-pipe shutdown request returned failure: {0}".format(
+                    result.get("error", "unknown error")
+                )
+            )
+
+    def _request_named_pipe_shutdown(self, pipe_name: str, timeout: int) -> dict[str, object]:
+        transport = NamedPipeScriptTransport(
+            pipe_name=pipe_name,
+            now_fn=self.now_fn,
+            sleep_fn=self.sleep_fn,
+        )
+        shutdown_script = (
+            "session.running = False\n"
+            "result = {'success': True, 'message': 'Shutdown requested'}\n"
+        )
+        return transport.execute_script(shutdown_script, timeout=timeout)
 
     def _log_failed_start(self) -> None:
         if self.process is None:
             return
 
-        try:
-            stdout, stderr = self.process.communicate(timeout=1)
-            stderr_text = stderr.decode("utf-8", errors="replace") if stderr else "No error output"
-            stdout_text = stdout.decode("utf-8", errors="replace") if stdout else "No standard output"
-            self.logger.error(
-                "CODESYS process failed to start:\nStderr: %s\nStdout: %s",
-                stderr_text,
-                stdout_text,
+        buffered_logs = "".join(self.get_log_lines()) or "No buffered process output"
+        self.logger.error("CODESYS process failed to start. Buffered output:\n%s", buffered_logs)
+        self._record_runtime_event("CODESYS process failed to start")
+
+    def _start_output_threads(self) -> None:
+        self.output_threads = []
+        process = self.process
+        if process is None:
+            return
+
+        stdout_stream = cast(BufferedReader | None, getattr(process, "stdout", None))
+        stderr_stream = cast(BufferedReader | None, getattr(process, "stderr", None))
+
+        for name, stream in (("STDOUT", stdout_stream), ("STDERR", stderr_stream)):
+            if stream is None:
+                continue
+            thread = threading.Thread(
+                target=self._read_process_stream,
+                args=(name, stream),
+                daemon=True,
             )
-        except Exception as exc:
-            self.logger.error("Error communicating with failed process: %s", str(exc))
+            thread.start()
+            self.output_threads.append(thread)
+
+    def _join_output_threads(self) -> None:
+        for thread in self.output_threads:
+            thread.join(timeout=1.0)
+        self.output_threads = []
+
+    def _read_process_stream(self, source: str, stream: BufferedReader) -> None:
+        while True:
+            line = stream.readline()
+            if line:
+                self._append_log_line("{0}: {1}".format(source, self._decode_log_line(line)))
+                continue
+            process = self.process
+            if process is None or process.poll() is not None:
+                break
+            self.sleep_fn(0.05)
+
+    def _decode_log_line(self, line: bytes) -> str:
+        decoded = line.decode("utf-8", errors="replace")
+        if decoded.endswith("\n"):
+            return decoded
+        return decoded + "\n"
+
+    def _append_log_line(self, line: str) -> None:
+        with self.log_lock:
+            self.log_buffer.append(line)
+
+    def _record_runtime_event(self, message: str) -> None:
+        timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+        self._append_log_line("[{0}] HOST: {1}\n".format(timestamp, message))

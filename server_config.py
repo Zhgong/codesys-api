@@ -11,7 +11,7 @@ DEFAULT_SERVER_PORT = 8080
 DEFAULT_CODESYS_PATH = Path(r"C:\Program Files\CODESYS 3.5.21.0\CODESYS\Common\CODESYS.exe")
 DEFAULT_TRANSPORT = "named_pipe"
 DEFAULT_PIPE_NAME = "codesys_api_session"
-LEGACY_TRANSPORTS = frozenset({"file"})
+REMOVAL_CANDIDATE_TRANSPORTS = frozenset({"file"})
 
 
 @dataclass(frozen=True)
@@ -27,16 +27,11 @@ class ServerConfig:
     script_dir: Path
     persistent_script: Path
     api_key_file: Path
-    request_dir: Path
-    result_dir: Path
-    termination_signal_file: Path
-    status_file: Path
-    log_file: Path
     script_lib_dir: Path
 
     @property
     def transport_is_legacy(self) -> bool:
-        return self.transport_name in LEGACY_TRANSPORTS
+        return self.transport_name in REMOVAL_CANDIDATE_TRANSPORTS
 
     @property
     def transport_is_primary(self) -> bool:
@@ -44,16 +39,18 @@ class ServerConfig:
 
     @property
     def transport_is_supported(self) -> bool:
-        return self.transport_is_primary or self.transport_is_legacy
+        return self.transport_is_primary
 
     @property
-    def transport_requires_explicit_opt_in(self) -> bool:
+    def transport_is_removal_candidate(self) -> bool:
         return self.transport_is_legacy
 
     @property
     def transport_role(self) -> str:
-        if self.transport_is_legacy:
-            return "legacy_fallback"
+        if self.transport_is_removal_candidate:
+            return "unsupported_removal_candidate"
+        if not self.transport_is_supported:
+            return "unsupported"
         return "primary"
 
     @property
@@ -65,17 +62,10 @@ class ServerConfig:
             "transport": self.transport_name,
             "transport_role": self.transport_role,
             "transport_legacy": self.transport_is_legacy,
+            "transport_removal_candidate": self.transport_is_removal_candidate,
             "recommended_transport": self.recommended_transport,
             "pipe_name": self.pipe_name,
         }
-
-    def build_transport_startup_warning(self) -> str | None:
-        if not self.transport_requires_explicit_opt_in:
-            return None
-        return "Using explicit legacy fallback transport: {0} (recommended primary: {1})".format(
-            self.transport_name,
-            self.recommended_transport,
-        )
 
 
 def _profile_name_from_path(profile_path: Path) -> str:
@@ -151,10 +141,5 @@ def load_server_config(base_dir: Path, env: Mapping[str, str]) -> ServerConfig:
         script_dir=base_dir,
         persistent_script=base_dir / "PERSISTENT_SESSION.py",
         api_key_file=base_dir / "api_keys.json",
-        request_dir=base_dir / "requests",
-        result_dir=base_dir / "results",
-        termination_signal_file=base_dir / "terminate.signal",
-        status_file=base_dir / "session_status.json",
-        log_file=base_dir / "session.log",
         script_lib_dir=base_dir / "ScriptLib",
     )

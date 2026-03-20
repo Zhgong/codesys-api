@@ -2,65 +2,51 @@
 
 ## Current Position
 
-- `named_pipe` is the only recommended transport.
-- `file` remains available as a manual legacy fallback.
-- `file` fast real acceptance is retained as a compatibility baseline.
-- `file` slow real acceptance is opt-in through `CODESYS_E2E_FILE_FULL=1`.
+- `named_pipe` is the only supported runtime transport.
+- host-side `file` transport has been deleted.
+- the historical CODESYS-side file request/result path has also been deleted from `PERSISTENT_SESSION.py`.
+- file-based control and status have also been removed.
+- the only remaining file artifact is:
+  - `session.log`
 
-## Retirement Readiness Criteria
+## Historical Readiness Criteria
 
-The `file` transport is ready to move from "legacy fallback" to "removal candidate"
-only when all of the following are true:
+The host-side `file` transport reached removal-candidate status only after all
+of the following were true:
 
-1. `named_pipe` passes the default fast real CODESYS acceptance repeatedly.
-2. `named_pipe` passes the default full real CODESYS acceptance repeatedly.
-3. No known runtime issue requires switching to `file` to complete the main project,
-   POU, script, compile, or recovery workflows.
-4. Transport diagnostics and recovery analysis can be performed using `named_pipe`
-   logs, metadata, and tests without depending on `file` for differential debugging.
-5. Host-side and CODESYS-side protocol coverage for `named_pipe` remains green in
+1. `named_pipe` passed the default fast real CODESYS acceptance repeatedly.
+2. `named_pipe` passed the default full real CODESYS acceptance repeatedly.
+3. No known runtime issue required switching to `file` for main project, POU,
+   script, compile, or recovery workflows.
+4. Transport diagnostics and recovery analysis could be performed using
+   `named_pipe` logs, metadata, and tests without depending on `file`.
+5. Host-side and CODESYS-side protocol coverage for `named_pipe` stayed green in
    the default `pytest`, `mypy`, and `py_compile` gates.
 
-## Not In Scope Yet
+## Historical Candidate Boundary
 
-- This document does not authorize deleting `FileScriptTransport`.
-- This document does not authorize removing file-based paths from
-  `PERSISTENT_SESSION.py`.
-- This document does not change REST API behavior.
-- This document does not change the default environment variables.
+The removal-candidate boundary that enabled host-side deletion was:
 
-## Current Prep Boundary
-
-The active prep work is host-side only:
-
-- keep `file` behind explicit legacy builders, config helpers, and legacy baseline tests
-- isolate the host-side file transport implementation so later removal is mechanical
-- keep the main host-side transport facade free of file-specific implementation exports
-- keep runtime transport selection on a primary-builder path, with file only behind explicit legacy opt-in
-- keep legacy file transport entry out of the primary compatibility builder entirely
-- keep unsupported transport names failing fast instead of silently falling back to the primary path
-- keep `HTTP_SERVER.py` free of direct legacy-vs-primary transport wiring where practical
-- keep `HTTP_SERVER.py` free of direct transport metadata assembly where practical
-- keep `HTTP_SERVER.py` free of direct legacy transport warning text where practical
+- keep `file` behind explicit legacy seams
+- isolate the host-side file transport implementation
+- keep the primary transport facade free of file-specific exports
+- keep runtime transport selection on a primary-builder path
+- fail fast on unsupported transport names
 - keep default diagnostics and default acceptance centered on `named_pipe`
-- do not yet change the file transport path inside `PERSISTENT_SESSION.py`
+- postpone deletion of the CODESYS-side file request path until host-side work was complete
 
-## Next Step After Readiness
+## Current Status
 
-Once the readiness criteria are satisfied for a sustained period, the next phase
-should be a separate, explicit removal plan that:
+The host-side deletion phase defined in
+`HOST_SIDE_FILE_TRANSPORT_DELETION_PLAN.md` has been executed.
 
-- removes `file` from default documentation and operational guidance entirely
-- reduces host-side file transport code to migration-only stubs or deletes it
-- removes file-based real E2E baselines
-- keeps one final regression checkpoint before actual deletion
+The follow-up CODESYS-side request-path cleanup has also been executed.
 
-## Current Phase Status
+This document is now purely historical. It records the readiness conditions that
+justified file transport retirement and no longer gates active implementation.
 
-The current host-side prep phase is intended to end once:
+## Not In Scope
 
-- primary transport selection, transport metadata, and startup warning semantics are all outside `HTTP_SERVER.py`
-- file transport enters host-side runtime only through explicit legacy seams
-- the main host-side transport facade no longer exposes file compatibility helpers
-
-After that point, the next stage should be a removal-candidate decision, not more prep refinement.
+- changing REST API behavior
+- changing the default environment variables for the current `named_pipe` runtime
+- evolving the remaining log-file lifecycle behavior
