@@ -1,15 +1,8 @@
-from __future__ import annotations
+from typing import TYPE_CHECKING
 
-from collections.abc import Mapping
+from _repo_bootstrap import alias_module
 
-
-DEFAULT_E2E_TRANSPORT = "named_pipe"
-SUPPORTED_E2E_TRANSPORTS = frozenset({DEFAULT_E2E_TRANSPORT})
-
-
-def current_codesys_e2e_transport(env: Mapping[str, str]) -> str:
-    return env.get("CODESYS_E2E_TRANSPORT", DEFAULT_E2E_TRANSPORT).strip().lower()
-
-
-def current_codesys_e2e_transport_is_supported(env: Mapping[str, str]) -> bool:
-    return current_codesys_e2e_transport(env) in SUPPORTED_E2E_TRANSPORTS
+if TYPE_CHECKING:
+    from codesys_api.codesys_e2e_policy import *  # noqa: F401,F403
+else:
+    alias_module(__name__, "codesys_api.codesys_e2e_policy")

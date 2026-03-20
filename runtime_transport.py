@@ -1,24 +1,8 @@
-from __future__ import annotations
+from typing import TYPE_CHECKING
 
-from typing import Callable
+from _repo_bootstrap import alias_module
 
-from named_pipe_transport import NamedPipeScriptTransport
-from server_config import ServerConfig
-from session_transport import build_primary_script_transport
-
-
-PrimaryBuilder = Callable[..., NamedPipeScriptTransport]
-
-
-def build_runtime_transport(
-    config: ServerConfig,
-    *,
-    primary_builder: PrimaryBuilder = build_primary_script_transport,
-) -> NamedPipeScriptTransport:
-    """Build the active runtime transport using primary-by-default semantics."""
-
-    if not config.transport_is_supported:
-        raise ValueError("Unsupported transport: {0}".format(config.transport_name))
-    return primary_builder(
-        pipe_name=config.pipe_name,
-    )
+if TYPE_CHECKING:
+    from codesys_api.runtime_transport import *  # noqa: F401,F403
+else:
+    alias_module(__name__, "codesys_api.runtime_transport")

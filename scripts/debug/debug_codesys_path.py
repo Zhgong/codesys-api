@@ -118,7 +118,7 @@ def check_codesys_path():
         return False
     
     print("\n== Script Path Check ==")
-    SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+    SCRIPT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     PERSISTENT_SCRIPT = os.path.join(SCRIPT_DIR, "PERSISTENT_SESSION.py")
     
     if os.path.exists(PERSISTENT_SCRIPT):

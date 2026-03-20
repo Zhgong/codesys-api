@@ -15,32 +15,33 @@ CLI is complete enough for normal local use:
 - local entrypoints and usage docs are in place
 - real CLI positive and negative smoke paths exist
 
-The current active line is now baseline establishment:
+The baseline phase is complete, and the current active line is now repo reorganization:
 
-- `BASELINE.md` defines the current engineering, contract, and real-CODESYS baseline
-- `scripts/run_baseline.py` runs the local engineering baseline
-- baseline documentation tests lock the commands and references
+- core host-side implementation now lives under `src/codesys_api/`
+- long-lived documents are moving under `docs/`
+- debug and diagnostic helpers are moving under `scripts/debug/`
+- runtime stub assets now live under `codesys_assets/`
+- root entrypoints remain compatible while the internal layout is cleaned up
 
 Latest stable checkpoints:
 
 - `3a16ec9` completed transport cleanup and established the local CLI
 - `8e0d4d3` replaced file-based session logs with a runtime buffer
+- `75d84b4` established the repository baseline
 
 ## Verification Status
 
 These commands are green:
 
 ```powershell
-python -m pytest -q --basetemp C:\Users\vboxuser\Desktop\pytest_manual_root
-python -m mypy
-python -m py_compile HTTP_SERVER.py action_layer.py api_key_store.py app_runtime.py codesys_cli.py codesys_e2e_policy.py codesys_process.py engine_adapter.py ironpython_script_engine.py runtime_transport.py script_executor.py server_config.py server_logic.py test_server.py named_pipe_transport.py transport_result.py tests/e2e/codesys/test_real_codesys_cli.py
+python scripts\run_baseline.py
 ```
 
 Expected results at handoff:
 
 - `pytest`: `150 passed, 8 skipped`
-- `mypy`: success with no issues in `36` source files
-- `git status --short`: expected to show only the baseline follow-up files if this phase is still uncommitted
+- `mypy`: success with no issues in `44` source files
+- `git status --short`: expected to show the repo-reorg batch until it is committed
 
 Real validation already confirmed:
 
@@ -71,14 +72,11 @@ This round did not rerun real CODESYS acceptance. The baseline documents the cur
 
 ## Next Best Steps
 
-1. Treat the CLI as the active major phase.
-2. Finish the final small CLI polish pass:
-   - keep command coverage fixed
-   - improve grouped help examples
-   - keep human-readable output and setup errors consistent with `CLI_USAGE.md`
-3. Do not add more commands by default unless a clearly missing workflow appears.
-4. Treat the baseline as the required safety net before repo reorg or packaging work.
-5. The next stage after this one should be repo reorganization, not new transport/lifecycle work.
+1. Treat repo reorganization as the active major phase.
+2. Keep root entrypoints compatible while moving internal code and long-lived assets into their structured directories.
+3. Run `python scripts\run_baseline.py` after each structural slice.
+4. Do not reopen transport or lifecycle work unless the reorg exposes a regression.
+5. The next stage after this one should be packaging (`pip install .`), not more flat-root cleanup for its own sake.
 
 ## Quick Resume Checklist
 

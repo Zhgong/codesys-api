@@ -13,19 +13,14 @@ markers = [
 python_version = "3.14"
 strict = true
 warn_unused_configs = true
+mypy_path = ["src"]
 files = [
-    "action_layer.py",
-    "app_runtime.py",
-    "api_key_store.py",
+    "_repo_bootstrap.py",
+    "src/codesys_api",
     "codesys_cli.py",
-    "codesys_e2e_policy.py",
-    "codesys_process.py",
-    "engine_adapter.py",
-    "ironpython_script_engine.py",
-    "runtime_transport.py",
-    "script_executor.py",
-    "server_config.py",
-    "server_logic.py",
+    "HTTP_SERVER.py",
+    "test_server.py",
+    "scripts/run_baseline.py",
     "tests/integration",
     "tests/unit",
     "tests/e2e/codesys",

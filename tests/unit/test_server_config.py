@@ -33,7 +33,7 @@ def test_load_server_config_uses_current_repo_defaults(tmp_path: Path) -> None:
     assert config.script_dir == tmp_path
     assert config.persistent_script == tmp_path / "PERSISTENT_SESSION.py"
     assert config.api_key_file == tmp_path / "api_keys.json"
-    assert config.script_lib_dir == tmp_path / "ScriptLib"
+    assert config.script_lib_dir == tmp_path / "codesys_assets" / "ScriptLib"
 
 
 def test_load_server_config_accepts_environment_overrides(tmp_path: Path) -> None:

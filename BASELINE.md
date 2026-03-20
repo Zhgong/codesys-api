@@ -19,13 +19,14 @@ Run these commands on every major change:
 ```powershell
 python -m pytest -q --basetemp C:\Users\vboxuser\Desktop\pytest_manual_root
 python -m mypy
-python -m py_compile HTTP_SERVER.py action_layer.py api_key_store.py app_runtime.py codesys_cli.py codesys_e2e_policy.py codesys_process.py engine_adapter.py ironpython_script_engine.py runtime_transport.py script_executor.py server_config.py server_logic.py test_server.py named_pipe_transport.py transport_result.py tests/e2e/codesys/test_real_codesys_cli.py
+python -m py_compile HTTP_SERVER.py codesys_cli.py test_server.py _repo_bootstrap.py src/codesys_api/*.py tests/e2e/codesys/test_real_codesys_cli.py
+python scripts\run_baseline.py
 ```
 
 Current expected result:
 
-- `pytest`: `147 passed, 8 skipped`
-- `mypy`: success with no issues in `35` source files
+- `pytest`: `150 passed, 8 skipped`
+- `mypy`: success with no issues in `44` source files
 - `py_compile`: success
 
 ## Contract Baseline
@@ -56,6 +57,7 @@ These are currently represented by:
 - `tests/unit/test_http_server_system_info.py`
 - `tests/unit/test_http_server_system_logs.py`
 - `tests/e2e/mock/test_mock_server_e2e.py`
+- `tests/e2e/codesys/test_real_codesys_cli.py`
 - `tests/e2e/codesys/test_real_codesys_e2e.py`
 
 ## Real CODESYS Baseline
@@ -100,6 +102,13 @@ Use the baseline runner for the local engineering and contract baseline:
 ```powershell
 python scripts\run_baseline.py
 ```
+
+The baseline runner now also protects the current reorg direction:
+
+- root entrypoints remain callable
+- implementation modules live under `src/codesys_api/`
+- runtime stub assets live under `codesys_assets/`
+- long-lived docs move under `docs/`
 
 Real CODESYS baseline remains opt-in and requires the existing environment variables:
 

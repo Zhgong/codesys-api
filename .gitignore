@@ -26,6 +26,7 @@ api_keys.json
 # Temporary directories
 requests/
 results/
+artifacts/generated/
 
 # Session status file
 session_status.json
@@ -46,6 +47,13 @@ tmp/
 real_smoke_*.project
 real_server_stdout.log
 real_server_stderr.log
+
+# Local pytest temp roots that can pick up Windows ACL oddities
+.pytest-tmp/
+.pytest-tmp-run/
+manual_pytest_tmp/
+pytesttmp_abs/
+tmpc5ph5jfm/
 
 # Windows service-related
 *.exe

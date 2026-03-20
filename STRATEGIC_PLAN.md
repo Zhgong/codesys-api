@@ -10,8 +10,9 @@ The repository has already completed the heavy internal transition:
 - named-pipe-only transport
 - lifecycle cleanup phase 2
 - baseline phase
+- repo reorganization phase
 
-The transport, lifecycle, compile-hardening, and local CLI lines are now all substantially complete. The current priority is to formalize the baseline before structural work.
+The transport, lifecycle, compile-hardening, and local CLI lines are now all substantially complete. The current priority is to finish the repository reorganization under the protection of the formal baseline.
 
 ## Current Checkpoint
 
@@ -32,6 +33,14 @@ Current CLI coverage now includes:
 - `pou create|list|code`
 
 `/api/v1/system/logs` remains, but it now reads from an in-memory runtime log buffer instead of a file.
+
+The repository layout is now shifting away from the flat root:
+
+- core host-side implementation is moving into `src/codesys_api/`
+- runtime stub assets are moving into `codesys_assets/`
+- long-lived documents are moving into `docs/`
+- debug and diagnostic helpers are moving into `scripts/debug/`
+- root entrypoints remain temporarily for compatibility
 
 ## Target Architecture
 
@@ -73,17 +82,14 @@ Current CLI coverage now includes:
 
 ### Active Phase
 
-Baseline establishment:
+Repo reorganization:
 
-- `BASELINE.md` defines the current gates and real acceptance expectations
-- `scripts/run_baseline.py` provides the local engineering baseline entrypoint
-- the baseline now gates the next two major phases:
-  - repo reorganization
-  - packaging
+- `BASELINE.md` defines the gates that must stay green during structural changes
+- `scripts/run_baseline.py` is the required safety net for every reorg slice
+- the current objective is to finish the `src/`, `docs/`, `scripts/`, and `codesys_assets/` layout without breaking root entrypoints
 
 ### Deferred
 
-- repo reorganization
 - packaging for `pip install .`
 - broader CLI packaging/distribution
 - future AI/tool integration surfaces
@@ -94,4 +100,5 @@ Baseline establishment:
 - Keep REST API v1 stable.
 - Keep `named_pipe` as the only supported runtime transport.
 - Treat lifecycle cleanup as done unless a regression appears.
-- Use the baseline before any repo reorg or packaging work.
+- Use the baseline continuously during repo reorg.
+- Prefer compatibility wrappers over one-shot breaking moves during this phase.

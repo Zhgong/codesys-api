@@ -1,5 +1,17 @@
 # CODESYS REST API
 
+## Repository Layout
+
+The repository is in the middle of a compatibility-first reorganization:
+
+- root entrypoints such as `HTTP_SERVER.py`, `codesys_cli.py`, and `run_cli.bat` remain usable
+- core host-side implementation is moving into `src/codesys_api/`
+- long-lived documentation is moving into `docs/`
+- debug and diagnostic helpers are moving into `scripts/debug/`
+- runtime stub assets now live under `codesys_assets/`
+
+Use `BASELINE.md` and `python scripts\\run_baseline.py` before and after structural changes.
+
 ![CODESYS API Logo](https://via.placeholder.com/1200x300/0073CF/FFFFFF?text=CODESYS+REST+API)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)

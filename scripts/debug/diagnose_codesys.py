@@ -21,7 +21,7 @@ CODESYS_PATH = r"C:\Program Files\CODESYS 3.5.21.0\CODESYS\Common\CODESYS.exe"
 
 # Test directories
 TEMP_DIR = tempfile.gettempdir()
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+SCRIPT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Test files
 TEST_SCRIPT_PATH = os.path.join(TEMP_DIR, "codesys_test_script.py")
@@ -144,7 +144,7 @@ def run_codesys_with_script():
             os.remove(STATUS_FILE)
             
         # Set up environment with PYTHONPATH pointing to ScriptLib
-        script_lib_path = os.path.join(SCRIPT_DIR, "ScriptLib")
+        script_lib_path = os.path.join(SCRIPT_DIR, "codesys_assets", "ScriptLib")
         env = os.environ.copy()
         if "PYTHONPATH" in env:
             env["PYTHONPATH"] = script_lib_path + os.pathsep + env["PYTHONPATH"]
