@@ -25,8 +25,8 @@ python scripts\run_baseline.py
 
 Current expected result:
 
-- `pytest`: `160 passed, 8 skipped`
-- `mypy`: success with no issues in `54` source files
+- `pytest`: `164 passed, 8 skipped`
+- `mypy`: success with no issues in `57` source files
 - `py_compile`: success
 
 ## Contract Baseline
@@ -160,3 +160,19 @@ Internal release flow builds on packaging phase 2 and requires:
 - baseline success
 - version-matching wheel and sdist artifacts
 - clean wheel-install smoke
+
+## Public Release Prep Gate
+
+Public release prep adds a public-facing documentation and metadata gate:
+
+```powershell
+python scripts\check_public_release.py
+```
+
+Expected result:
+
+- public metadata exists in `pyproject.toml`
+- `README.md` states Windows experimental support and local CODESYS dependency
+- `docs/PUBLIC_RELEASE.md` exists
+- wheel build succeeds
+- clean wheel-install smoke succeeds

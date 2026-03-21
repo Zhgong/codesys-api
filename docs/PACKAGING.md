@@ -6,10 +6,12 @@ The repository now supports two packaging levels:
 
 - local install: `pip install .`
 - release artifact build: `python scripts\build_release.py`
+- public release prep gate: `python scripts\check_public_release.py`
 
 The immediate goal of packaging phase 2 is **repeatable internal distribution**, not PyPI.
 
 For the release checklist and internal install flow, see [RELEASE.md](RELEASE.md).
+For public package preparation, see [PUBLIC_RELEASE.md](PUBLIC_RELEASE.md).
 
 ## Prerequisites
 

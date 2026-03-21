@@ -10,6 +10,8 @@ This flow is for **internal distribution only**:
 - no installer generation
 - no cross-platform packaging promises
 
+For public-package readiness, see [PUBLIC_RELEASE.md](PUBLIC_RELEASE.md).
+
 ## Version Source
 
 The single version source is `pyproject.toml`:

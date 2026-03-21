@@ -23,5 +23,5 @@ def test_release_notes_tracks_current_internal_release_candidate() -> None:
     assert "## Unreleased" in release_notes
     assert "Current Internal Release Candidate" in release_notes
     assert "Commit: fill this in when cutting the internal release" in release_notes
-    assert "160 passed, 8 skipped" in release_notes
-    assert "`54` source files" in release_notes
+    assert "164 passed, 8 skipped" in release_notes
+    assert "`57` source files" in release_notes

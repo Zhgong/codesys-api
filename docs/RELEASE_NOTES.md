@@ -5,8 +5,8 @@
 ### Current Internal Release Candidate
 
 - Commit: fill this in when cutting the internal release
-- Baseline gate: `160 passed, 8 skipped`
-- Static gate: `mypy` passes with no issues in `54` source files
+- Baseline gate: `164 passed, 8 skipped`
+- Static gate: `mypy` passes with no issues in `57` source files
 - Packaging gate:
   - `python scripts\build_release.py` succeeds
   - wheel and sdist are produced

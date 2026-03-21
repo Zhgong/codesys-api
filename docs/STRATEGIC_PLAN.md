@@ -15,8 +15,9 @@ The repository has already completed the heavy internal transition:
 - root cleanup phase
 - packaging phase 2
 - internal wheel release flow
+- public release prep
 
-The transport, lifecycle, compile-hardening, local CLI, packaging phase 1, root cleanup, packaging phase 2, and internal wheel release flow are now all substantially complete. The current priority is no longer internal cleanup; it is to decide the next outward-facing phase.
+The transport, lifecycle, compile-hardening, local CLI, packaging phase 1, root cleanup, packaging phase 2, internal wheel release flow, and public release prep are now all substantially complete. The current priority is no longer internal cleanup; it is to decide whether to publish publicly or move into a new outward-facing product phase.
 
 ## Current Checkpoint
 
@@ -32,6 +33,8 @@ Completed lines:
 - repeatable wheel and sdist generation is in place
 - clean wheel-install smoke is in place
 - internal release checklist and release notes are in place
+- public-facing metadata, README, and installation guidance are in place
+- a public release prep gate is in place
 
 Current CLI coverage now includes:
 
@@ -99,6 +102,7 @@ The repository layout has already shifted away from the flat root:
 
 ### Next Decision
 
+- actual PyPI publication
 - broader product-facing work
 - future AI/tool integration surfaces
 - broader public release decisions beyond internal distribution flow

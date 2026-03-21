@@ -1,244 +1,123 @@
-# CODESYS REST API
+# codesys-api
 
-## Repository Layout
+Windows-first, experimental local automation tooling for CODESYS.
 
-The repository is in the middle of a compatibility-first reorganization:
+`codesys-api` provides:
 
-- root entrypoints such as `HTTP_SERVER.py`, `codesys_cli.py`, and `run_cli.bat` remain usable
-- core host-side implementation is moving into `src/codesys_api/`
-- long-lived documentation is moving into `docs/`
-- debug and diagnostic helpers are moving into `scripts/debug/`
-- manual and dev helper scripts now live under `scripts/manual/` and `scripts/dev/`
-- runtime stub assets now live under `src/codesys_api/assets/`
+- a local CLI: `codesys-cli`
+- a local HTTP server: `codesys-api-server`
+- a persistent CODESYS runtime built around `named_pipe`
 
-Use `docs/BASELINE.md` and `python scripts\\run_baseline.py` before and after structural changes.
+## Support Boundary
 
-![CODESYS API Logo](https://via.placeholder.com/1200x300/0073CF/FFFFFF?text=CODESYS+REST+API)
+This project is currently published as:
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python Version](https://img.shields.io/badge/python-3.x-blue.svg)](https://www.python.org/downloads/)
-[![Platform](https://img.shields.io/badge/platform-Windows-lightgrey.svg)]()
+- Windows-only
+- experimental
+- intended for local CODESYS installations
 
-本项目旨在提供一个极速、有状态且极具大模型友好性（LLM-Friendly）的 CODESYS 命令行接口。通过在后台维护持久化的 CODESYS 会话，它不仅消除了传统脚本的启动延迟，还通过极简的 CLI 抽象层，让 AI 代理和 CI/CD 流水线能够以极低的 Token 成本和极高的稳定性自动化生成、测试和编译 PLC 控制逻辑，并为未来无缝迁移至 CODESYS Scripting 4.2.0 奠定架构基础。
+Current assumptions:
 
-## 🎯 核心愿景 (Core Vision)
+- CODESYS must already be installed on the target machine
+- the runtime transport is `named_pipe` only
+- the package does not include a bundled CODESYS runtime
+- public release prep is in place, but the project is not yet committed to cross-platform support
 
-1. **核心定位 (Core Positioning):** 打造 AI 原生（AI-Native）的极速工业编程接口，以“零协议开销”降低 Token 消耗并提升大模型直接控制 CODESYS 环境的成功率。
-2. **性能目的 (Performance Goal):** 实现“毫秒级”的持久化状态交互，彻底消除 CODESYS 每次执行脚本时的冷启动过程等待时间。
-3. **架构目的 (Architecture Goal):** 建立防过时（Future-Proof）的抽象隔离层，解耦业务逻辑与底层环境，为未来无缝切换到无用户界面的 Python 3 脚本引擎做好准备。
-4. **业务目的 (Business Goal):** 填补现代 IT 与传统 OT（操作技术）的鸿沟，让传统的重型 PLC 工业软件能够无缝接入现代的 DevOps 和 CI/CD 流水线。
+## Installation
 
-## 📋 Features
+For local development:
 
-- **Persistent CODESYS Session**: Maintains a single running instance of CODESYS for improved performance
-- **RESTful API**: Provides standard HTTP endpoints for all CODESYS operations
-- **Session Management**: Start, stop, and monitor CODESYS sessions
-- **Project Operations**: Create, open, save, close, and compile projects
-- **POU Management**: Create and modify Program Organization Units
-- **Script Execution**: Execute arbitrary CODESYS scripts
-- **Authentication**: Secure access with API keys
-- **Windows Service**: Run as a background service with auto-recovery
-- **Comprehensive Logging**: Detailed activity and error logging
-
-## 🚀 Quick Start
-
-### Prerequisites
-
-- Windows OS with CODESYS 3.5 or later installed
-- Python 3.x installed
-  - Note: Only the PERSISTENT_SESSION.py script maintains compatibility with CODESYS IronPython environment
-- Administrator privileges (for service installation)
-
-### Installation
-
-1. Clone this repository:
-   ```
-   git clone https://github.com/johannesPettersson80/codesys-api.git
-   ```
-
-2. Navigate to the project directory:
-   ```
-   cd codesys-api
-   ```
-
-3. Install required packages:
-   ```
-   pip install requests pywin32
-   ```
-
-4. Run the installation script:
-   ```
-   install.bat
-   ```
-
-   If you prefer not to install as a Windows service, use:
-   ```
-   python HTTP_SERVER.py
-   ```
-
-5. Verify the installation:
-   ```
-   python scripts\\manual\\example_client.py
-   ```
-
-For detailed installation instructions, see [docs/INSTALLATION_GUIDE.md](docs/INSTALLATION_GUIDE.md) and [docs/CODESYS_SCRIPT_COMPATIBILITY.md](docs/CODESYS_SCRIPT_COMPATIBILITY.md).
-
-## 📖 API Documentation
-
-### Authentication
-
-All API requests require an API key in the header:
-
-```
-Authorization: ApiKey YOUR_API_KEY
+```powershell
+pip install .
 ```
 
-### Endpoints
+For release artifacts:
 
-#### Session Management
-
-- `POST /api/v1/session/start`: Start CODESYS session
-- `POST /api/v1/session/stop`: Stop CODESYS session
-- `GET /api/v1/session/status`: Get session status
-- `POST /api/v1/session/restart`: Restart CODESYS session
-
-#### Project Operations
-
-- `POST /api/v1/project/create`: Create new project
-- `POST /api/v1/project/open`: Open existing project
-- `POST /api/v1/project/save`: Save current project
-- `POST /api/v1/project/close`: Close current project
-- `POST /api/v1/project/compile`: Compile project
-- `GET /api/v1/project/list`: List recent projects
-
-#### POU Management
-
-- `POST /api/v1/pou/create`: Create new POU
-- `POST /api/v1/pou/code`: Set POU code
-- `GET /api/v1/pou/list`: List POUs in project
-
-#### Script Execution
-
-- `POST /api/v1/script/execute`: Execute arbitrary script
-
-#### System Operations
-
-- `GET /api/v1/system/info`: Get system information
-- `GET /api/v1/system/logs`: Get system logs
-
-## 📝 Example Usage
-
-### Example Client
-
-The repository includes an example client (`scripts/manual/example_client.py`) demonstrating basic operations:
-
-```python
-import requests
-
-# API configuration
-API_BASE_URL = "http://localhost:8080/api/v1"
-API_KEY = "admin"  # Default API key
-
-# Call API with authentication
-def call_api(method, endpoint, data=None):
-    headers = {"Authorization": f"ApiKey {API_KEY}"}
-    url = f"{API_BASE_URL}/{endpoint}"
-    
-    if method.upper() == "GET":
-        response = requests.get(url, headers=headers)
-    elif method.upper() == "POST":
-        response = requests.post(url, json=data, headers=headers)
-        
-    return response.json()
-
-# Start a session
-result = call_api("POST", "session/start")
-print(f"Session started: {result}")
-
-# Create a project
-project_data = {"path": "C:/Temp/TestProject.project"}
-result = call_api("POST", "project/create", project_data)
-print(f"Project created: {result}")
+```powershell
+python scripts\build_release.py
+python -m pip install dist\codesys_api-*.whl
 ```
 
-For a complete example workflow, see [scripts/manual/example_client.py](scripts/manual/example_client.py).
+## Required Environment
 
-## 🧰 Architecture
+At minimum, local CODESYS usage requires:
 
-The CODESYS REST API consists of several key components:
+- `CODESYS_API_CODESYS_PATH`
+- `CODESYS_API_CODESYS_PROFILE`
+- `CODESYS_API_CODESYS_PROFILE_PATH`
 
-1. **HTTP REST API Server**: Processes incoming requests and routes them to handlers
-2. **CODESYS Session Manager**: Maintains and monitors the persistent CODESYS instance
-3. **Script Execution Engine**: Generates and executes scripts in the CODESYS environment
-4. **Authentication System**: Validates API keys and controls access
+The CLI and server both use the same runtime wiring and packaged assets.
 
-For more information about the architecture, see [docs/PROJECT_SUMMARY.md](docs/PROJECT_SUMMARY.md).
+## Quick Start
 
-## 🔧 Configuration
+CLI:
 
-### Server Configuration
-
-Server settings can be configured by editing `HTTP_SERVER.py`:
-
-```python
-# Constants
-SERVER_HOST = '0.0.0.0'  # Listen on all interfaces
-SERVER_PORT = 8080       # HTTP port
-CODESYS_PATH = r"C:\Program Files\CODESYS 3.5\CODESYS\CODESYS.exe"
+```powershell
+codesys-cli --help
+codesys-cli session start
+codesys-cli project create --path C:\work\demo.project
+codesys-cli project compile
+codesys-cli project close
+codesys-cli session stop
 ```
 
-### API Keys
+Server:
 
-API keys are stored under `%APPDATA%\\codesys-api\\api_keys.json`:
-
-```json
-{
-  "admin": {"name": "Admin", "created": 1620000000.0}
-}
+```powershell
+codesys-api-server --help
+python HTTP_SERVER.py
 ```
 
-## 📚 Documentation
+Repo-local compatibility entrypoints remain available:
 
-- [docs/INSTALLATION_GUIDE.md](docs/INSTALLATION_GUIDE.md): Detailed installation instructions
-- [docs/IMPLEMENTATION_CHECKLIST.md](docs/IMPLEMENTATION_CHECKLIST.md): Development progress and status
-- [docs/CODESYS_SCRIPT_COMPATIBILITY.md](docs/CODESYS_SCRIPT_COMPATIBILITY.md): Notes on scripting compatibility
-- [docs/PROJECT_SUMMARY.md](docs/PROJECT_SUMMARY.md): Overview of implementation details
-- [docs/CLI_USAGE.md](docs/CLI_USAGE.md): CLI usage and examples
-- [docs/BASELINE.md](docs/BASELINE.md): Baseline gates and validation commands
-- [docs/PACKAGING.md](docs/PACKAGING.md): Build and wheel verification flow
-- [docs/RELEASE.md](docs/RELEASE.md): Internal wheel release checklist
-- [docs/RELEASE_NOTES.md](docs/RELEASE_NOTES.md): Internal release record
+- `python codesys_cli.py ...`
+- `python HTTP_SERVER.py`
+- `run_cli.bat ...`
 
-## 🚨 Troubleshooting
+## What It Does
 
-### Common Issues
+- starts and stops a local persistent CODESYS session
+- creates, opens, saves, closes, and compiles projects
+- creates and edits POUs
+- exposes the same core actions through both CLI and HTTP entrypoints
 
-- **API returns "Unauthorized"**: Check that you're using the correct API key
-- **Service fails to start**: Verify CODESYS path is correct and CODESYS is installed
-- **Connection refused**: Ensure the service is running and the port is not blocked
+Compile validation currently uses:
 
-### Logs
+- build
+- generate code
 
-Check the following log files for error messages:
+## Validation Status
 
-- `codesys_api_service.log`: Windows service log (if running as a service)
+Current local engineering baseline:
 
-## 🤝 Contributing
+- `python scripts\run_baseline.py`
+- latest expected result: `164 passed, 8 skipped`
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Current release validation:
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+- `python scripts\build_release.py`
+- clean wheel-install smoke
+- packaged asset lookup smoke
 
-## 📜 License
+## Documentation
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+- [docs/CLI_USAGE.md](docs/CLI_USAGE.md): CLI commands and examples
+- [docs/INSTALLATION_GUIDE.md](docs/INSTALLATION_GUIDE.md): installation and local setup
+- [docs/PACKAGING.md](docs/PACKAGING.md): build and wheel verification flow
+- [docs/RELEASE.md](docs/RELEASE.md): internal wheel release checklist
+- [docs/PUBLIC_RELEASE.md](docs/PUBLIC_RELEASE.md): public release preparation checklist
+- [docs/BASELINE.md](docs/BASELINE.md): baseline gates and validation commands
 
-## 🙏 Acknowledgements
+## Not Included
 
-- CODESYS Group for the CODESYS automation software and scripting API
-- Python community for excellent libraries and tools
-- All contributors to this project
+This project does not currently provide:
+
+- a hosted/cloud service
+- cross-platform support
+- a bundled CODESYS installation
+- an installer
+- public API stability guarantees beyond the current local tooling contract
+
+## License
+
+MIT. See [LICENSE](LICENSE).

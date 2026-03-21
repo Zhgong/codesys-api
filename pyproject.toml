@@ -10,14 +10,28 @@ readme = "README.md"
 requires-python = ">=3.14"
 license = "MIT"
 license-files = ["LICENSE"]
+authors = [
+    { name = "codesys-api maintainers" },
+]
+keywords = ["codesys", "plc", "industrial-automation", "cli", "rest-api"]
 dependencies = [
     "requests",
     "pywin32",
 ]
 classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
     "Programming Language :: Python :: 3",
     "Operating System :: Microsoft :: Windows",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Scientific/Engineering",
 ]
+
+[project.urls]
+Homepage = "https://github.com/Zhgong/codesys-api"
+Repository = "https://github.com/Zhgong/codesys-api"
+Issues = "https://github.com/Zhgong/codesys-api/issues"
+Documentation = "https://github.com/Zhgong/codesys-api/tree/main/docs"
 
 [project.scripts]
 codesys-cli = "codesys_api.cli_entry:main"
@@ -61,6 +75,7 @@ files = [
     "HTTP_SERVER.py",
     "scripts/dev/test_server.py",
     "scripts/build_release.py",
+    "scripts/check_public_release.py",
     "scripts/run_baseline.py",
     "tests/integration",
     "tests/unit",

@@ -15,7 +15,7 @@ CLI is complete enough for normal local use:
 - local entrypoints and usage docs are in place
 - real CLI positive and negative smoke paths exist
 
-The baseline, repo reorg, packaging phase 1, root cleanup, packaging phase 2, and the internal release flow are complete:
+The baseline, repo reorg, packaging phase 1, root cleanup, packaging phase 2, internal release flow, and public release prep are complete:
 
 - core host-side implementation now lives under `src/codesys_api/`
 - long-lived documents now live under `docs/`
@@ -27,6 +27,7 @@ The baseline, repo reorg, packaging phase 1, root cleanup, packaging phase 2, an
 - wheel and sdist build flow is now documented and repeatable
 - clean wheel-install smoke has been validated in a fresh venv
 - internal release checklist and release notes are now in place
+- public-facing metadata, README, install guide, and release-prep gate are now in place
 
 Latest stable checkpoints:
 
@@ -37,6 +38,7 @@ Latest stable checkpoints:
 - `fdf6f47` packaged the reorganized project for `pip install .`
 - `c4a59f2` reduced root layout to formal entrypoints
 - `01f36fa` formalized wheel build and release flow
+- public release prep local work is implemented but not yet committed
 
 ## Verification Status
 
@@ -48,9 +50,9 @@ python scripts\run_baseline.py
 
 Expected results at handoff:
 
-- `pytest`: `160 passed, 8 skipped`
-- `mypy`: success with no issues in `54` source files
-- `git status --short`: should show the internal-release working set until this round is committed
+- `pytest`: `164 passed, 8 skipped`
+- `mypy`: success with no issues in `57` source files
+- `git status --short`: should show the public-release-prep working set until this round is committed
 
 Real validation already confirmed:
 
@@ -82,6 +84,13 @@ Internal release proof now includes:
   - `docs/RELEASE.md`
   - `docs/RELEASE_NOTES.md`
 
+Public release prep now adds:
+
+- `python scripts\check_public_release.py` succeeds
+- README states Windows experimental support
+- install docs match the current package and entrypoints
+- public release checklist exists
+
 ## Important Constraints
 
 - Do not reopen transport design or file-transport work unless a regression appears.
@@ -98,10 +107,10 @@ Internal release proof now includes:
 2. Keep `HTTP_SERVER.py`, `codesys_cli.py`, `run_cli.bat`, and `PERSISTENT_SESSION.py` compatible.
 3. Keep ordinary imports on `codesys_api.*`; do not reintroduce root module shims.
 4. Run `python scripts\run_baseline.py` before any follow-up structural work.
-5. The next likely major stage is beyond release engineering:
+5. The next likely major stage is beyond public-release prep:
+   - actual PyPI publication
    - broader product-facing work
    - future integration surfaces
-   - or more formal external release decisions
 
 ## Quick Resume Checklist
 

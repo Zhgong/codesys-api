@@ -13,6 +13,11 @@ def test_pyproject_defines_build_backend_and_console_scripts() -> None:
     assert 'name = "codesys-api"' in pyproject
     assert 'codesys-cli = "codesys_api.cli_entry:main"' in pyproject
     assert 'codesys-api-server = "codesys_api.server_entry:main"' in pyproject
+    assert 'authors = [' in pyproject
+    assert 'keywords = [' in pyproject
+    assert '[project.urls]' in pyproject
+    assert 'Homepage = "https://github.com/Zhgong/codesys-api"' in pyproject
+    assert 'Development Status :: 3 - Alpha' in pyproject
 
 
 def test_root_wrappers_delegate_to_package_entrypoints() -> None:
