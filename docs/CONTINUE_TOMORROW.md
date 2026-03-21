@@ -15,7 +15,7 @@ CLI is complete enough for normal local use:
 - local entrypoints and usage docs are in place
 - real CLI positive and negative smoke paths exist
 
-The baseline, repo reorg, packaging phase 1, root cleanup, and packaging phase 2 are complete:
+The baseline, repo reorg, packaging phase 1, root cleanup, packaging phase 2, and the internal release flow are complete:
 
 - core host-side implementation now lives under `src/codesys_api/`
 - long-lived documents now live under `docs/`
@@ -26,6 +26,7 @@ The baseline, repo reorg, packaging phase 1, root cleanup, and packaging phase 2
 - most root docs and helper scripts now live under `docs/` and `scripts/`
 - wheel and sdist build flow is now documented and repeatable
 - clean wheel-install smoke has been validated in a fresh venv
+- internal release checklist and release notes are now in place
 
 Latest stable checkpoints:
 
@@ -35,7 +36,7 @@ Latest stable checkpoints:
 - `8e95c68` reorganized the repository into a structured layout
 - `fdf6f47` packaged the reorganized project for `pip install .`
 - `c4a59f2` reduced root layout to formal entrypoints
-- packaging phase 2 local work is implemented but not yet committed
+- `01f36fa` formalized wheel build and release flow
 
 ## Verification Status
 
@@ -47,9 +48,9 @@ python scripts\run_baseline.py
 
 Expected results at handoff:
 
-- `pytest`: `158 passed, 8 skipped`
-- `mypy`: success with no issues in `53` source files
-- `git status --short`: should show the packaging-phase-2 working set until this round is committed
+- `pytest`: `160 passed, 8 skipped`
+- `mypy`: success with no issues in `54` source files
+- `git status --short`: should show the internal-release working set until this round is committed
 
 Real validation already confirmed:
 
@@ -66,7 +67,7 @@ Real validation already confirmed:
   - `session stop`
 - CLI negative compile detection works when breaking `Application\PLC_PRG`
 
-Packaging phase 2 proof now includes:
+Internal release proof now includes:
 
 - local baseline stays green
 - `pip install .` works
@@ -77,6 +78,9 @@ Packaging phase 2 proof now includes:
 - installed `codesys-cli --help` works from a clean venv
 - installed `codesys-api-server --help` works from a clean venv
 - installed package assets resolve correctly
+- internal release docs exist:
+  - `docs/RELEASE.md`
+  - `docs/RELEASE_NOTES.md`
 
 ## Important Constraints
 
@@ -94,10 +98,10 @@ Packaging phase 2 proof now includes:
 2. Keep `HTTP_SERVER.py`, `codesys_cli.py`, `run_cli.bat`, and `PERSISTENT_SESSION.py` compatible.
 3. Keep ordinary imports on `codesys_api.*`; do not reintroduce root module shims.
 4. Run `python scripts\run_baseline.py` before any follow-up structural work.
-5. The next likely major stage is beyond packaging:
-   - internal release/wheel distribution policy
+5. The next likely major stage is beyond release engineering:
    - broader product-facing work
-   - or future integration surfaces
+   - future integration surfaces
+   - or more formal external release decisions
 
 ## Quick Resume Checklist
 

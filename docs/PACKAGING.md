@@ -9,6 +9,8 @@ The repository now supports two packaging levels:
 
 The immediate goal of packaging phase 2 is **repeatable internal distribution**, not PyPI.
 
+For the release checklist and internal install flow, see [RELEASE.md](RELEASE.md).
+
 ## Prerequisites
 
 - Python 3.14+
@@ -68,6 +70,22 @@ python scripts\build_release.py
 ```
 
 Then verify wheel install smoke in a clean environment.
+
+## Internal Install and Upgrade
+
+Install from a built wheel:
+
+```powershell
+python -m pip install dist\codesys_api-*.whl
+```
+
+Upgrade an existing installation:
+
+```powershell
+python -m pip install --upgrade dist\codesys_api-*.whl
+```
+
+The formal internal release sequence is documented in [RELEASE.md](RELEASE.md).
 
 ## Current Boundaries
 

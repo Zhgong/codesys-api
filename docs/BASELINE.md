@@ -25,8 +25,8 @@ python scripts\run_baseline.py
 
 Current expected result:
 
-- `pytest`: `158 passed, 8 skipped`
-- `mypy`: success with no issues in `53` source files
+- `pytest`: `160 passed, 8 skipped`
+- `mypy`: success with no issues in `54` source files
 - `py_compile`: success
 
 ## Contract Baseline
@@ -150,3 +150,13 @@ Expected result:
 - installed `codesys-cli --help` succeeds
 - installed `codesys-api-server --help` succeeds
 - installed package assets resolve correctly
+
+## Internal Release Gate
+
+Internal release flow builds on packaging phase 2 and requires:
+
+- `docs/RELEASE.md`
+- `docs/RELEASE_NOTES.md`
+- baseline success
+- version-matching wheel and sdist artifacts
+- clean wheel-install smoke

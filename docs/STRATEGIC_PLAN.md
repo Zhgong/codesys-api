@@ -14,8 +14,9 @@ The repository has already completed the heavy internal transition:
 - packaging phase 1
 - root cleanup phase
 - packaging phase 2
+- internal wheel release flow
 
-The transport, lifecycle, compile-hardening, local CLI, packaging phase 1, root cleanup, and packaging phase 2 lines are now all substantially complete. The current priority is no longer internal cleanup; it is to decide the next outward-facing phase.
+The transport, lifecycle, compile-hardening, local CLI, packaging phase 1, root cleanup, packaging phase 2, and internal wheel release flow are now all substantially complete. The current priority is no longer internal cleanup; it is to decide the next outward-facing phase.
 
 ## Current Checkpoint
 
@@ -30,6 +31,7 @@ Completed lines:
 - formal baseline documentation and runner are in place
 - repeatable wheel and sdist generation is in place
 - clean wheel-install smoke is in place
+- internal release checklist and release notes are in place
 
 Current CLI coverage now includes:
 
@@ -97,13 +99,13 @@ The repository layout has already shifted away from the flat root:
 
 ### Next Decision
 
-- internal wheel distribution and release policy
 - broader product-facing work
 - future AI/tool integration surfaces
+- broader public release decisions beyond internal distribution flow
 
 ### Deferred
 
-- broader public release decisions beyond internal distribution flow
+- none in the old cleanup/release line; that line is now complete
 
 ## Guidance
 

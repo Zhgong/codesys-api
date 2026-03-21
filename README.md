@@ -206,6 +206,8 @@ API keys are stored under `%APPDATA%\\codesys-api\\api_keys.json`:
 - [docs/CLI_USAGE.md](docs/CLI_USAGE.md): CLI usage and examples
 - [docs/BASELINE.md](docs/BASELINE.md): Baseline gates and validation commands
 - [docs/PACKAGING.md](docs/PACKAGING.md): Build and wheel verification flow
+- [docs/RELEASE.md](docs/RELEASE.md): Internal wheel release checklist
+- [docs/RELEASE_NOTES.md](docs/RELEASE_NOTES.md): Internal release record
 
 ## 🚨 Troubleshooting
 

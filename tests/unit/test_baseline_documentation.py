@@ -12,7 +12,7 @@ def test_baseline_document_includes_current_gate_commands() -> None:
     assert "python -m pytest -q --basetemp C:\\Users\\vboxuser\\Desktop\\pytest_manual_root" in baseline
     assert "python -m mypy" in baseline
     assert "python -m py_compile" in baseline
-    assert "158 passed, 8 skipped" in baseline
+    assert "160 passed, 8 skipped" in baseline
 
 
 def test_baseline_document_references_cli_and_http_contracts() -> None:
