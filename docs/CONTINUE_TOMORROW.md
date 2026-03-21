@@ -28,6 +28,7 @@ The baseline, repo reorg, packaging phase 1, root cleanup, packaging phase 2, in
 - clean wheel-install smoke has been validated in a fresh venv
 - internal release checklist and release notes are now in place
 - public-facing metadata, README, install guide, and release-prep gate are now in place
+- GitHub Actions CI, release-build, and manual publish workflows are now in place
 
 Latest stable checkpoints:
 
@@ -38,7 +39,10 @@ Latest stable checkpoints:
 - `fdf6f47` packaged the reorganized project for `pip install .`
 - `c4a59f2` reduced root layout to formal entrypoints
 - `01f36fa` formalized wheel build and release flow
-- public release prep local work is implemented but not yet committed
+- `1fa83b0` defined the internal wheel release flow
+- `771aa04` prepared the package for public release
+- `f117636` renamed the public package to `codesys-tools`
+- GitHub CI/CD automation local work is implemented but not yet committed
 
 ## Verification Status
 
@@ -50,9 +54,9 @@ python scripts\run_baseline.py
 
 Expected results at handoff:
 
-- `pytest`: `164 passed, 8 skipped`
-- `mypy`: success with no issues in `57` source files
-- `git status --short`: should show the public-release-prep working set until this round is committed
+- `pytest`: `167 passed, 8 skipped`
+- `mypy`: success with no issues in `58` source files
+- `git status --short`: should show the GitHub CI/CD working set until this round is committed
 
 Real validation already confirmed:
 
@@ -90,6 +94,14 @@ Public release prep now adds:
 - README states Windows experimental support
 - install docs match the current package and entrypoints
 - public release checklist exists
+- package name is now `codesys-tools`
+- installed entrypoints are now:
+  - `codesys`
+  - `codesys-server`
+- GitHub Actions workflows now exist for:
+  - CI on `master`
+  - manual release builds
+  - manual TestPyPI / PyPI publish
 
 ## Important Constraints
 
@@ -103,14 +115,13 @@ Public release prep now adds:
 
 ## Next Best Steps
 
-1. Treat root cleanup as implemented and ready to be committed.
-2. Keep `HTTP_SERVER.py`, `codesys_cli.py`, `run_cli.bat`, and `PERSISTENT_SESSION.py` compatible.
-3. Keep ordinary imports on `codesys_api.*`; do not reintroduce root module shims.
-4. Run `python scripts\run_baseline.py` before any follow-up structural work.
-5. The next likely major stage is beyond public-release prep:
-   - actual PyPI publication
-   - broader product-facing work
-   - future integration surfaces
+1. Keep `HTTP_SERVER.py`, `codesys_cli.py`, `run_cli.bat`, and `PERSISTENT_SESSION.py` compatible.
+2. Keep ordinary imports on `codesys_api.*`; do not reintroduce root module shims.
+3. Run `python scripts\run_baseline.py` before any follow-up release or product work.
+4. The active stage is now GitHub CI/CD:
+   - wire GitHub Environments for Trusted Publishing
+   - run the first TestPyPI publish
+   - then decide on first real PyPI publication
 
 ## Quick Resume Checklist
 

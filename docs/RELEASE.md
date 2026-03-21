@@ -12,6 +12,12 @@ This flow is for **internal distribution only**:
 
 For public-package readiness, see [PUBLIC_RELEASE.md](PUBLIC_RELEASE.md).
 
+GitHub Actions now mirrors this release path:
+
+- `.github/workflows/ci.yml`
+- `.github/workflows/release-build.yml`
+- `.github/workflows/publish.yml`
+
 ## Version Source
 
 The single version source is `pyproject.toml`:
@@ -41,6 +47,12 @@ C:\Users\vboxuser\Desktop\codesys-tools-wheel-smoke\Scripts\python.exe -m pip in
 C:\Users\vboxuser\Desktop\codesys-tools-wheel-smoke\Scripts\codesys.exe --help
 C:\Users\vboxuser\Desktop\codesys-tools-wheel-smoke\Scripts\codesys-server.exe --help
 ```
+
+GitHub-hosted equivalent:
+
+- CI on `push` / `pull_request` to `master`
+- manual `Release Build` workflow for artifact production
+- manual `Publish Package` workflow for TestPyPI or PyPI
 
 Installed package validation must also confirm:
 
@@ -81,3 +93,11 @@ For each internal release, record:
 - wheel smoke result
 
 Append release summaries to [RELEASE_NOTES.md](RELEASE_NOTES.md).
+
+## First Public Publication Order
+
+1. Confirm `CI` is green on `master`
+2. Run the manual `Release Build` workflow
+3. Run the manual `Publish Package` workflow with `target=testpypi`
+4. Verify install from TestPyPI in a clean environment
+5. Run the manual `Publish Package` workflow with `target=pypi`

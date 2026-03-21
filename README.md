@@ -91,13 +91,14 @@ Compile validation currently uses:
 Current local engineering baseline:
 
 - `python scripts\run_baseline.py`
-- latest expected result: `164 passed, 8 skipped`
+- latest expected result: `167 passed, 8 skipped`
 
 Current release validation:
 
 - `python scripts\build_release.py`
 - clean wheel-install smoke
 - packaged asset lookup smoke
+- GitHub Actions CI and manual release workflows
 
 ## Documentation
 
@@ -107,6 +108,7 @@ Current release validation:
 - [docs/RELEASE.md](docs/RELEASE.md): internal wheel release checklist
 - [docs/PUBLIC_RELEASE.md](docs/PUBLIC_RELEASE.md): public release preparation checklist
 - [docs/BASELINE.md](docs/BASELINE.md): baseline gates and validation commands
+- [.github/workflows](.github/workflows): CI, release-build, and manual publish workflows
 
 ## Not Included
 

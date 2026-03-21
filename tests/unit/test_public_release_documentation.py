@@ -25,6 +25,8 @@ def test_public_release_docs_link_current_public_entrypoints() -> None:
     assert "python scripts\\check_public_release.py" in release_doc
     assert "Windows-only" in release_doc
     assert "experimental" in release_doc
+    assert ".github/workflows/publish.yml" in release_doc
+    assert "Trusted Publishing" in release_doc
     assert "codesys --help" in install_doc
     assert "codesys-server --help" in install_doc
     assert "named_pipe" in install_doc
