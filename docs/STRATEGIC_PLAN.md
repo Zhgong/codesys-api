@@ -13,8 +13,9 @@ The repository has already completed the heavy internal transition:
 - repo reorganization phase
 - packaging phase 1
 - root cleanup phase
+- packaging phase 2
 
-The transport, lifecycle, compile-hardening, local CLI, packaging phase 1, and root cleanup lines are now all substantially complete. The current priority is no longer internal cleanup; it is to choose the next outward-facing phase.
+The transport, lifecycle, compile-hardening, local CLI, packaging phase 1, root cleanup, and packaging phase 2 lines are now all substantially complete. The current priority is no longer internal cleanup; it is to decide the next outward-facing phase.
 
 ## Current Checkpoint
 
@@ -27,6 +28,8 @@ Completed lines:
 - CLI v1 and v2 command coverage are in place
 - CLI final polish is in place
 - formal baseline documentation and runner are in place
+- repeatable wheel and sdist generation is in place
+- clean wheel-install smoke is in place
 
 Current CLI coverage now includes:
 
@@ -83,19 +86,24 @@ The repository layout has already shifted away from the flat root:
 - compile hardening
 - CLI productization and final polish
 
-### Active Phase
+### Completed
 
-Root cleanup:
+- packaging phase 2:
+  - `docs/BASELINE.md` remains the engineering gate
+  - `scripts/build_release.py` is the release-artifact gate
+  - repeatable `wheel + sdist` generation is validated
+  - clean wheel-install smoke is validated
+  - packaged console scripts and packaged assets resolve correctly
 
-- `docs/BASELINE.md` defines the gates that must stay green during structural changes
-- `scripts/run_baseline.py` is the required safety net for every reorg slice
-- the current objective was to shrink repo root to formal entrypoints, metadata, and Windows-service artifacts without breaking root entrypoints
-- that objective is now implemented locally and validated by the baseline
+### Next Decision
+
+- internal wheel distribution and release policy
+- broader product-facing work
+- future AI/tool integration surfaces
 
 ### Deferred
 
-- packaging phase 2 (wheel / internal distribution / release flow)
-- future AI/tool integration surfaces
+- broader public release decisions beyond internal distribution flow
 
 ## Guidance
 

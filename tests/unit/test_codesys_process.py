@@ -329,7 +329,7 @@ def test_start_captures_process_stdout_and_stderr_into_log_buffer(tmp_path: Path
     config.profile_path.write_text("<Profile />", encoding="utf-8")
     config.script_lib_dir.mkdir()
     process = FakeProcess(
-        ([None] * 20) + [0],
+        ([None] * 100) + [0],
         stdout_lines=[b"[2026-03-20 10:00:00] Initializing\n"],
         stderr_lines=[b"warning line\n"],
     )

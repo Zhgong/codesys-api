@@ -25,8 +25,8 @@ python scripts\run_baseline.py
 
 Current expected result:
 
-- `pytest`: `156 passed, 8 skipped`
-- `mypy`: success with no issues in `50` source files
+- `pytest`: `158 passed, 8 skipped`
+- `mypy`: success with no issues in `53` source files
 - `py_compile`: success
 
 ## Contract Baseline
@@ -133,3 +133,20 @@ Use this baseline before:
 - major dependency upgrades
 - CODESYS version changes
 - runtime or compile behavior changes
+
+## Packaging Phase 2 Gate
+
+Packaging phase 2 adds a release-artifact gate on top of the engineering baseline:
+
+```powershell
+python scripts\build_release.py
+```
+
+Expected result:
+
+- `dist/*.whl` exists
+- `dist/*.tar.gz` exists
+- clean wheel install smoke succeeds
+- installed `codesys-cli --help` succeeds
+- installed `codesys-api-server --help` succeeds
+- installed package assets resolve correctly
