@@ -9,18 +9,18 @@ This is a CODESYS REST API wrapper that provides HTTP endpoints for interacting 
 ## Development Commands
 
 ### Starting the Server
-- **Main server**: `python HTTP_SERVER.py` or `run_server.bat`
-- **Test server** (no CODESYS): `python test_server.py` or `run_test_server.bat`
-- **Debug mode**: Use `simple_test.bat` for interactive debugging and testing
+- **Main server**: `python HTTP_SERVER.py` or `scripts\dev\run_server.bat`
+- **Test server** (no CODESYS): `python scripts\dev\test_server.py` or `scripts\dev\run_test_server.bat`
+- **Debug mode**: Use `scripts\dev\simple_test.bat` for interactive debugging and testing
 
 ### Testing
-- **Example client**: `python example_client.py` (demonstrates full workflow)
-- **Simple API client**: `python simple_api_client.py`
+- **Example client**: `python scripts\manual\example_client.py` (demonstrates full workflow)
+- **Simple API client**: `python scripts\manual\simple_api_client.py`
 - **Debug scripts**: `python simplified_debug.py` (comprehensive diagnostics)
 
 ### Installation
 - **Install as service**: `install.bat` (requires admin privileges)
-- **Start manually**: `start_server.bat`
+- **Start manually**: `python HTTP_SERVER.py`
 - **Uninstall service**: `uninstall.bat`
 
 ## Architecture
@@ -67,7 +67,7 @@ CODESYS_PATH = r"C:\Program Files\CODESYS 3.5.21.0\CODESYS\Common\CODESYS.exe"
 ```
 
 ### API Keys
-- Stored in `api_keys.json`
+- Stored in `%APPDATA%\codesys-api\api_keys.json`
 - Default key: "admin"
 - Header format: `Authorization: ApiKey YOUR_API_KEY`
 
@@ -87,7 +87,7 @@ All endpoints prefixed with `/api/v1/`:
 1. Add handler in `HTTP_SERVER.py` route_request method
 2. Add corresponding operation in `PERSISTENT_SESSION.py`
 3. Update API documentation in README.md
-4. Test with both `example_client.py` and direct HTTP calls
+4. Test with both `scripts\manual\example_client.py` and direct HTTP calls
 
 ### CODESYS Script Development
 - Use Python 2.7 syntax in PERSISTENT_SESSION.py
@@ -102,7 +102,7 @@ All endpoints prefixed with `/api/v1/`:
 - Termination via `terminate.signal` file
 
 ### Error Handling
-- Server logs to `codesys_api_server.log`
+- Server logs are exposed via `/api/v1/system/logs`
 - Session logs to `session.log`
 - Use timeout of 120 seconds for script execution
 - Check directory permissions before file operations

@@ -19,14 +19,14 @@ Run these commands on every major change:
 ```powershell
 python -m pytest -q --basetemp C:\Users\vboxuser\Desktop\pytest_manual_root
 python -m mypy
-python -m py_compile HTTP_SERVER.py codesys_cli.py test_server.py _repo_bootstrap.py src/codesys_api/*.py tests/e2e/codesys/test_real_codesys_cli.py
+python -m py_compile HTTP_SERVER.py codesys_cli.py scripts/dev/test_server.py _repo_bootstrap.py src/codesys_api/*.py tests/e2e/codesys/test_real_codesys_cli.py
 python scripts\run_baseline.py
 ```
 
 Current expected result:
 
-- `pytest`: `150 passed, 8 skipped`
-- `mypy`: success with no issues in `44` source files
+- `pytest`: `156 passed, 8 skipped`
+- `mypy`: success with no issues in `50` source files
 - `py_compile`: success
 
 ## Contract Baseline
@@ -107,8 +107,8 @@ The baseline runner now also protects the current reorg direction:
 
 - root entrypoints remain callable
 - implementation modules live under `src/codesys_api/`
-- runtime stub assets live under `codesys_assets/`
-- long-lived docs move under `docs/`
+- runtime stub assets live under `src/codesys_api/assets/`
+- long-lived docs live under `docs/`
 
 Real CODESYS baseline remains opt-in and requires the existing environment variables:
 

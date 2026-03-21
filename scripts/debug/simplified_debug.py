@@ -209,7 +209,7 @@ Based on the tests, here are some potential issues and solutions:
 
 4. Next steps for testing the API:
    a. First try the test_server without CODESYS integration:
-      python test_server.py
+      python scripts\\dev\\test_server.py
    
    b. Then try the API with:
       curl -H "Authorization: ApiKey admin" http://localhost:8080/api/v1/system/info
@@ -219,7 +219,7 @@ Based on the tests, here are some potential issues and solutions:
       
 For any errors you encounter, check:
 - debug.log for detailed log messages
-- codesys_api_server.log for server errors
+- /api/v1/system/logs for runtime server errors
 - session.log for CODESYS session errors
 """)
 

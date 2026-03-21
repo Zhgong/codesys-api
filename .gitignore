@@ -27,6 +27,7 @@ api_keys.json
 requests/
 results/
 artifacts/generated/
+artifacts/runtime/
 
 # Session status file
 session_status.json

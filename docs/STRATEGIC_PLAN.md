@@ -11,8 +11,10 @@ The repository has already completed the heavy internal transition:
 - lifecycle cleanup phase 2
 - baseline phase
 - repo reorganization phase
+- packaging phase 1
+- root cleanup phase
 
-The transport, lifecycle, compile-hardening, and local CLI lines are now all substantially complete. The current priority is to finish the repository reorganization under the protection of the formal baseline.
+The transport, lifecycle, compile-hardening, local CLI, packaging phase 1, and root cleanup lines are now all substantially complete. The current priority is no longer internal cleanup; it is to choose the next outward-facing phase.
 
 ## Current Checkpoint
 
@@ -34,13 +36,14 @@ Current CLI coverage now includes:
 
 `/api/v1/system/logs` remains, but it now reads from an in-memory runtime log buffer instead of a file.
 
-The repository layout is now shifting away from the flat root:
+The repository layout has already shifted away from the flat root:
 
 - core host-side implementation is moving into `src/codesys_api/`
-- runtime stub assets are moving into `codesys_assets/`
+- runtime stub assets are moving into `src/codesys_api/assets/`
 - long-lived documents are moving into `docs/`
 - debug and diagnostic helpers are moving into `scripts/debug/`
 - root entrypoints remain temporarily for compatibility
+- installation entrypoints now exist via `codesys-cli` and `codesys-api-server`
 
 ## Target Architecture
 
@@ -82,16 +85,16 @@ The repository layout is now shifting away from the flat root:
 
 ### Active Phase
 
-Repo reorganization:
+Root cleanup:
 
-- `BASELINE.md` defines the gates that must stay green during structural changes
+- `docs/BASELINE.md` defines the gates that must stay green during structural changes
 - `scripts/run_baseline.py` is the required safety net for every reorg slice
-- the current objective is to finish the `src/`, `docs/`, `scripts/`, and `codesys_assets/` layout without breaking root entrypoints
+- the current objective was to shrink repo root to formal entrypoints, metadata, and Windows-service artifacts without breaking root entrypoints
+- that objective is now implemented locally and validated by the baseline
 
 ### Deferred
 
-- packaging for `pip install .`
-- broader CLI packaging/distribution
+- packaging phase 2 (wheel / internal distribution / release flow)
 - future AI/tool integration surfaces
 
 ## Guidance

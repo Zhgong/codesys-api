@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, cast
 
-from runtime_transport import build_runtime_transport
+from codesys_api.runtime_transport import build_runtime_transport
 
 
 def test_build_runtime_transport_uses_primary_builder_by_default(tmp_path: Path) -> None:

@@ -15,13 +15,15 @@ CLI is complete enough for normal local use:
 - local entrypoints and usage docs are in place
 - real CLI positive and negative smoke paths exist
 
-The baseline and repo-reorg phases are complete:
+The baseline, repo-reorg, and packaging phase 1 are complete. Root cleanup is now implemented locally:
 
 - core host-side implementation now lives under `src/codesys_api/`
 - long-lived documents now live under `docs/`
 - debug and diagnostic helpers now live under `scripts/debug/`
-- runtime stub assets now live under `codesys_assets/`
+- runtime stub assets now live under `src/codesys_api/assets/`
 - root entrypoints remain compatible through thin wrapper modules
+- ordinary root module shims are gone
+- most root docs and helper scripts now live under `docs/` and `scripts/`
 
 Latest stable checkpoints:
 
@@ -29,6 +31,7 @@ Latest stable checkpoints:
 - `8e0d4d3` replaced file-based session logs with a runtime buffer
 - `75d84b4` established the repository baseline
 - `8e95c68` reorganized the repository into a structured layout
+- `fdf6f47` packaged the reorganized project for `pip install .`
 
 ## Verification Status
 
@@ -40,9 +43,9 @@ python scripts\run_baseline.py
 
 Expected results at handoff:
 
-- `pytest`: `150 passed, 8 skipped`
-- `mypy`: success with no issues in `44` source files
-- `git status --short`: should only show `M CONTINUE_TOMORROW.md` until this handoff note is committed
+- `pytest`: `156 passed, 8 skipped`
+- `mypy`: success with no issues in `51` source files
+- `git status --short`: should show the root-cleanup working set until this round is committed
 
 Real validation already confirmed:
 
@@ -59,7 +62,13 @@ Real validation already confirmed:
   - `session stop`
 - CLI negative compile detection works when breaking `Application\PLC_PRG`
 
-This round did not rerun real CODESYS acceptance. The baseline still documents the current real acceptance commands and expectations, but the required proof for the reorg phase was the local baseline gate.
+This round did not rerun real CODESYS acceptance. The required proof for packaging phase 1 was:
+
+- local baseline stays green
+- `pip install .` works
+- `codesys-cli --help` works
+- `codesys-api-server --help` works
+- installed package assets resolve correctly
 
 ## Important Constraints
 
@@ -73,19 +82,19 @@ This round did not rerun real CODESYS acceptance. The baseline still documents t
 
 ## Next Best Steps
 
-1. Treat repo reorganization as the active major phase.
-2. Keep root entrypoints compatible while moving internal code and long-lived assets into their structured directories.
-3. Run `python scripts\run_baseline.py` after each structural slice.
-4. Do not reopen transport or lifecycle work unless packaging exposes a regression.
-5. The next active stage should be packaging:
-   - make `pip install .` work on the reorganized layout
-   - add formal console entrypoints
-   - make runtime asset lookup work without relying on repo-root assumptions
+1. Treat root cleanup as implemented and ready to be committed.
+2. Keep `HTTP_SERVER.py`, `codesys_cli.py`, `run_cli.bat`, and `PERSISTENT_SESSION.py` compatible.
+3. Keep ordinary imports on `codesys_api.*`; do not reintroduce root module shims.
+4. Run `python scripts\run_baseline.py` before any follow-up structural work.
+5. The next likely major stage is packaging phase 2:
+   - wheel / internal distribution
+   - release flow
+   - or broader product-facing work
 
 ## Quick Resume Checklist
 
-1. Open `STRATEGIC_PLAN.md`
-2. Open `BASELINE.md`
+1. Open `docs\STRATEGIC_PLAN.md`
+2. Open `docs\BASELINE.md`
 3. Open this file
 4. Run:
 

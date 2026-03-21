@@ -88,7 +88,7 @@ For detailed installation and deployment instructions, please see the `INSTALLAT
 The simplest way to see the API in action is to use the provided example client:
 
 ```bash
-python example_client.py
+python scripts\manual\example_client.py
 ```
 
 This will demonstrate a complete workflow including:

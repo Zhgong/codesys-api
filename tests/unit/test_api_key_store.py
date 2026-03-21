@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from api_key_store import ApiKeyManager
+from codesys_api.api_key_store import ApiKeyManager
 
 
 def test_missing_key_file_bootstraps_default_admin_key(tmp_path: Path) -> None:

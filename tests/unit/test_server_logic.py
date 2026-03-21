@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from server_logic import (
+from codesys_api.server_logic import (
     build_default_project_path,
     build_status_payload,
     normalize_project_create_params,

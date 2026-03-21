@@ -11,7 +11,7 @@ from typing import Any
 
 import pytest
 
-from codesys_e2e_policy import (
+from codesys_api.codesys_e2e_policy import (
     current_codesys_e2e_transport,
     current_codesys_e2e_transport_is_supported,
 )

@@ -12,17 +12,17 @@ This guide provides step-by-step instructions for troubleshooting connection iss
 
 2. **Test HTTP Server Only (No CODESYS)**
    ```
-   run_test_server.bat
+   scripts\dev\run_test_server.bat
    ```
    This starts a simplified HTTP server that responds to API requests without connecting to CODESYS.
-   Test with: `python example_client.py` in another window.
+   Test with: `python scripts\manual\example_client.py` in another window.
 
 3. **Run Full Server**
    ```
-   run_server.bat
+   scripts\dev\run_server.bat
    ```
    This starts the complete HTTP server that connects to CODESYS.
-   Test with: `python example_client.py` in another window.
+   Test with: `python scripts\manual\example_client.py` in another window.
 
 ## Detailed Debugging Steps
 
@@ -49,12 +49,12 @@ Ensure that:
 
 Run the test server to isolate HTTP issues from CODESYS issues:
 ```
-run_test_server.bat
+scripts\dev\run_test_server.bat
 ```
 
 In another command prompt, run:
 ```
-python example_client.py
+python scripts\manual\example_client.py
 ```
 
 If this works, the issue is with CODESYS integration, not HTTP functionality.
@@ -66,7 +66,7 @@ Enable detailed logging in `HTTP_SERVER.py`:
 logging.basicConfig(
     level=logging.DEBUG,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    filename='codesys_api_server.log'
+    # Query /api/v1/system/logs for runtime logs
 )
 ```
 

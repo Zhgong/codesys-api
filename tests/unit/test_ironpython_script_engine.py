@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from ironpython_script_engine import IronPythonScriptEngineAdapter
+from codesys_api.ironpython_script_engine import IronPythonScriptEngineAdapter
 
 
 def make_adapter() -> IronPythonScriptEngineAdapter:

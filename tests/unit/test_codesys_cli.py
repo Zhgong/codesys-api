@@ -5,9 +5,9 @@ import json
 from pathlib import Path
 from typing import Any, cast
 
-from action_layer import ActionRequest, ActionResult
-import codesys_cli
-from codesys_cli import run_cli
+from codesys_api.action_layer import ActionRequest, ActionResult
+import codesys_api.cli_entry as codesys_cli
+from codesys_api.cli_entry import run_cli
 
 
 class FakeActionService:

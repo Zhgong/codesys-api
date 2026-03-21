@@ -6,7 +6,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from codesys_process import CodesysProcessManager, ProcessManagerConfig
+from codesys_api.codesys_process import CodesysProcessManager, ProcessManagerConfig
 
 
 class FakeProcess:

@@ -3,11 +3,11 @@ from __future__ import annotations
 import logging
 from typing import Any, cast
 
-from named_pipe_transport import NamedPipeScriptTransport
-import session_transport
-import runtime_transport
-from session_transport import build_primary_script_transport
-from script_executor import ScriptExecutor
+from codesys_api.named_pipe_transport import NamedPipeScriptTransport
+import codesys_api.session_transport as session_transport
+import codesys_api.runtime_transport as runtime_transport
+from codesys_api.session_transport import build_primary_script_transport
+from codesys_api.script_executor import ScriptExecutor
 
 
 def test_script_executor_delegates_to_transport() -> None:

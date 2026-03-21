@@ -4,8 +4,8 @@ import logging
 from pathlib import Path
 from typing import Any, cast
 
-from app_runtime import build_app_runtime
-from server_config import load_server_config
+from codesys_api.app_runtime import build_app_runtime
+from codesys_api.server_config import load_server_config
 
 
 class FakeProcessManager:

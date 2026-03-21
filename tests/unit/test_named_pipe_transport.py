@@ -3,15 +3,15 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import named_pipe_transport
+import codesys_api.named_pipe_transport as named_pipe_transport
 import pytest
-from named_pipe_transport import (
+from codesys_api.named_pipe_transport import (
     NamedPipeScriptTransport,
     build_pipe_path,
     decode_pipe_message,
     encode_pipe_message,
 )
-from transport_result import create_transport_execution
+from codesys_api.transport_result import create_transport_execution
 
 
 def test_encode_pipe_message_round_trips_json_payload() -> None:

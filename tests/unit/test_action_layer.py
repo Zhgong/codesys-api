@@ -4,8 +4,8 @@ import logging
 from pathlib import Path
 from typing import Any, cast
 
-from action_layer import ActionRequest, ActionService, ActionType
-from engine_adapter import EngineCapabilities, ExecutionSpec
+from codesys_api.action_layer import ActionRequest, ActionService, ActionType
+from codesys_api.engine_adapter import EngineCapabilities, ExecutionSpec
 
 
 class FakeProcessManager:

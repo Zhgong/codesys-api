@@ -27,3 +27,6 @@ def default_user_data_dir(env: Mapping[str, str]) -> Path:
 def default_api_key_file(env: Mapping[str, str]) -> Path:
     return default_user_data_dir(env) / "api_keys.json"
 
+
+def default_runtime_log_dir(env: Mapping[str, str]) -> Path:
+    return default_user_data_dir(env) / "logs"

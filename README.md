@@ -8,9 +8,10 @@ The repository is in the middle of a compatibility-first reorganization:
 - core host-side implementation is moving into `src/codesys_api/`
 - long-lived documentation is moving into `docs/`
 - debug and diagnostic helpers are moving into `scripts/debug/`
-- runtime stub assets now live under `codesys_assets/`
+- manual and dev helper scripts now live under `scripts/manual/` and `scripts/dev/`
+- runtime stub assets now live under `src/codesys_api/assets/`
 
-Use `BASELINE.md` and `python scripts\\run_baseline.py` before and after structural changes.
+Use `docs/BASELINE.md` and `python scripts\\run_baseline.py` before and after structural changes.
 
 ![CODESYS API Logo](https://via.placeholder.com/1200x300/0073CF/FFFFFF?text=CODESYS+REST+API)
 
@@ -72,15 +73,15 @@ Use `BASELINE.md` and `python scripts\\run_baseline.py` before and after structu
 
    If you prefer not to install as a Windows service, use:
    ```
-   start_server.bat
+   python HTTP_SERVER.py
    ```
 
 5. Verify the installation:
    ```
-   python example_client.py
+   python scripts\\manual\\example_client.py
    ```
 
-For detailed installation instructions, see the [Installation Guide](INSTALLATION_GUIDE.md) and [CODESYS Script Compatibility Guide](CODESYS_SCRIPT_COMPATIBILITY.md).
+For detailed installation instructions, see [docs/INSTALLATION_GUIDE.md](docs/INSTALLATION_GUIDE.md) and [docs/CODESYS_SCRIPT_COMPATIBILITY.md](docs/CODESYS_SCRIPT_COMPATIBILITY.md).
 
 ## 📖 API Documentation
 
@@ -129,7 +130,7 @@ Authorization: ApiKey YOUR_API_KEY
 
 ### Example Client
 
-The repository includes an example client (`example_client.py`) demonstrating basic operations:
+The repository includes an example client (`scripts/manual/example_client.py`) demonstrating basic operations:
 
 ```python
 import requests
@@ -160,7 +161,7 @@ result = call_api("POST", "project/create", project_data)
 print(f"Project created: {result}")
 ```
 
-For a complete example workflow, see the [example_client.py](example_client.py) file.
+For a complete example workflow, see [scripts/manual/example_client.py](scripts/manual/example_client.py).
 
 ## 🧰 Architecture
 
@@ -171,7 +172,7 @@ The CODESYS REST API consists of several key components:
 3. **Script Execution Engine**: Generates and executes scripts in the CODESYS environment
 4. **Authentication System**: Validates API keys and controls access
 
-For more information about the architecture, see the [Project Summary](PROJECT_SUMMARY.md).
+For more information about the architecture, see [docs/PROJECT_SUMMARY.md](docs/PROJECT_SUMMARY.md).
 
 ## 🔧 Configuration
 
@@ -188,7 +189,7 @@ CODESYS_PATH = r"C:\Program Files\CODESYS 3.5\CODESYS\CODESYS.exe"
 
 ### API Keys
 
-API keys are stored in `api_keys.json`:
+API keys are stored under `%APPDATA%\\codesys-api\\api_keys.json`:
 
 ```json
 {
@@ -198,10 +199,12 @@ API keys are stored in `api_keys.json`:
 
 ## 📚 Documentation
 
-- [Installation Guide](INSTALLATION_GUIDE.md): Detailed installation instructions
-- [Implementation Checklist](IMPLEMENTATION_CHECKLIST.md): Development progress and status
-- [Python 2.7 Compatibility](PY27_COMPATIBILITY.md): Notes on Python 2.7 compatibility
-- [Project Summary](PROJECT_SUMMARY.md): Overview of implementation details
+- [docs/INSTALLATION_GUIDE.md](docs/INSTALLATION_GUIDE.md): Detailed installation instructions
+- [docs/IMPLEMENTATION_CHECKLIST.md](docs/IMPLEMENTATION_CHECKLIST.md): Development progress and status
+- [docs/CODESYS_SCRIPT_COMPATIBILITY.md](docs/CODESYS_SCRIPT_COMPATIBILITY.md): Notes on scripting compatibility
+- [docs/PROJECT_SUMMARY.md](docs/PROJECT_SUMMARY.md): Overview of implementation details
+- [docs/CLI_USAGE.md](docs/CLI_USAGE.md): CLI usage and examples
+- [docs/BASELINE.md](docs/BASELINE.md): Baseline gates and validation commands
 
 ## 🚨 Troubleshooting
 
@@ -215,8 +218,6 @@ API keys are stored in `api_keys.json`:
 
 Check the following log files for error messages:
 
-- `codesys_api_server.log`: Main API server log
-- `session.log`: CODESYS session log
 - `codesys_api_service.log`: Windows service log (if running as a service)
 
 ## 🤝 Contributing

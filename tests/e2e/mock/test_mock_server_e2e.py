@@ -82,7 +82,7 @@ def mock_server() -> Generator[str, None, None]:
     env["TEST_SERVER_SCRIPT_EXECUTE_DELAY"] = "0.01"
 
     process = subprocess.Popen(
-        [sys.executable, "test_server.py"],
+        [sys.executable, "scripts/dev/test_server.py"],
         cwd=REPO_ROOT,
         env=env,
         stdout=subprocess.PIPE,

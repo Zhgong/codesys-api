@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from codesys_cli import build_parser
+from codesys_api.cli_entry import build_parser
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -44,7 +44,7 @@ def test_cli_usage_examples_match_parser() -> None:
         ],
     ]
 
-    usage = (REPO_ROOT / "CLI_USAGE.md").read_text(encoding="utf-8")
+    usage = (REPO_ROOT / "docs" / "CLI_USAGE.md").read_text(encoding="utf-8")
 
     for args in examples:
         package_command = "codesys-cli " + " ".join(args)

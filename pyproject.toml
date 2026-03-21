@@ -58,7 +58,7 @@ files = [
     "src/codesys_api",
     "codesys_cli.py",
     "HTTP_SERVER.py",
-    "test_server.py",
+    "scripts/dev/test_server.py",
     "scripts/run_baseline.py",
     "tests/integration",
     "tests/unit",

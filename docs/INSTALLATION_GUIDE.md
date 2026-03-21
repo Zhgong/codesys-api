@@ -39,9 +39,9 @@ pip install requests pywin32
 
 By default, the system uses a single API key `admin`. For production use, you should create your own API keys:
 
-1. Delete the `api_keys.json` file if it exists
+1. Delete `%APPDATA%\codesys-api\api_keys.json` if it exists
 2. The system will create a default API key on first run
-3. To create additional keys or change the default key, modify the `api_keys.json` file:
+3. To create additional keys or change the default key, modify `%APPDATA%\codesys-api\api_keys.json`:
    ```json
    {
      "your_api_key": {"name": "Your Key Name", "created": 1620000000.0}
@@ -60,7 +60,7 @@ install.bat
 
 If you prefer not to install as a Windows service, you can simply run:
 ```
-start_server.bat
+python HTTP_SERVER.py
 ```
 
 #### Manual Service Installation
@@ -92,7 +92,7 @@ The service will now start automatically when the system boots.
 Alternatively, you can use the provided example client script:
 
 ```
-python example_client.py
+python scripts\manual\example_client.py
 ```
 
 ## Running Manually (Without Service)
@@ -108,7 +108,7 @@ If you prefer to run the API server manually without installing it as a service:
    
    Or use the provided script:
    ```
-   start_server.bat
+   python HTTP_SERVER.py
    ```
 4. The server will start and display a message indicating it's running
 
@@ -121,7 +121,7 @@ The API server creates and uses the following directories:
 - `requests/`: Directory for inter-process communication request files
 - `results/`: Directory for inter-process communication result files
 - Logs are stored in the root directory:
-  - `codesys_api_server.log`: Main API server log
+  - `/api/v1/system/logs`: Main runtime log view
   - `session.log`: CODESYS session log
   - `codesys_api_service.log`: Windows service log (if running as a service)
 
@@ -138,18 +138,18 @@ The API server creates and uses the following directories:
 
 ### API Returns Errors
 
-1. Check the `codesys_api_server.log` file for API server errors
+1. Check `/api/v1/system/logs` for API/server runtime errors
 2. Check the `session.log` file for CODESYS session errors
 3. Verify CODESYS is installed and working correctly
 4. Try running the server manually to see any console output
 5. For Python 3.x compatibility issues, make sure you're using the correct version of files:
    - Use `HTTP_SERVER_PY3.py` instead of `HTTP_SERVER.py`
-   - Use `example_client_py3.py` instead of `example_client.py`
+   - Use `scripts\manual\example_client.py`
 
 ### Authentication Issues
 
 1. Verify you are using the correct API key in the Authorization header
-2. Check the `api_keys.json` file to ensure your key is listed
+2. Check `%APPDATA%\codesys-api\api_keys.json` to ensure your key is listed
 3. Restart the API server after making changes to the API keys
 
 ## Uninstallation
@@ -176,7 +176,7 @@ To remove the Windows service:
 ## Security Considerations
 
 - The API server does not use HTTPS by default. For production use, consider setting up a reverse proxy with HTTPS or implementing HTTPS support.
-- API keys are stored in plain text. Ensure the `api_keys.json` file has appropriate file permissions.
+- API keys are stored in plain text. Ensure `%APPDATA%\codesys-api\api_keys.json` has appropriate file permissions.
 - Consider running the service under a dedicated user account with minimal privileges.
 - Review firewall settings to restrict access to the API server port.
 

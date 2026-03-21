@@ -15,7 +15,7 @@ from urllib import error, request
 
 import pytest
 
-from codesys_e2e_policy import (
+from codesys_api.codesys_e2e_policy import (
     current_codesys_e2e_transport,
     current_codesys_e2e_transport_is_supported,
 )

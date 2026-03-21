@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from transport_result import (
+from codesys_api.transport_result import (
     TransportExecutionContext,
     TransportRequest,
     create_transport_execution,

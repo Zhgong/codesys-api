@@ -8,6 +8,7 @@ bootstrap_src_path()
 
 from codesys_api.runtime_paths import (
     default_api_key_file,
+    default_runtime_log_dir,
     default_user_data_dir,
     packaged_persistent_script,
     packaged_script_lib_dir,
@@ -27,3 +28,4 @@ def test_default_api_key_file_uses_appdata_when_available(tmp_path: Path) -> Non
 
     assert default_user_data_dir(env) == tmp_path / "Roaming" / "codesys-api"
     assert default_api_key_file(env) == tmp_path / "Roaming" / "codesys-api" / "api_keys.json"
+    assert default_runtime_log_dir(env) == tmp_path / "Roaming" / "codesys-api" / "logs"

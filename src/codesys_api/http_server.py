@@ -27,6 +27,7 @@ from typing import Any
 from .action_layer import ActionRequest, ActionType
 from .app_runtime import build_app_runtime
 from .api_key_store import ApiKeyManager
+from .runtime_paths import default_runtime_log_dir
 from .server_config import load_server_config
 
 # Python 3 compatibility imports
@@ -38,10 +39,14 @@ except ImportError:
     import urlparse
 
 # Setup logging
+SERVER_LOG_DIR = default_runtime_log_dir(os.environ)
+SERVER_LOG_DIR.mkdir(parents=True, exist_ok=True)
+SERVER_LOG_FILE = SERVER_LOG_DIR / "codesys_api_server.log"
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    filename='codesys_api_server.log'
+    filename=str(SERVER_LOG_FILE),
 )
 logger = logging.getLogger('codesys_api_server')
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from server_config import load_server_config
+from codesys_api.server_config import load_server_config
 
 
 def test_load_server_config_uses_current_repo_defaults(tmp_path: Path) -> None:
