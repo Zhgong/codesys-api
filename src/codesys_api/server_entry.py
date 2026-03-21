@@ -8,7 +8,7 @@ from .http_server import run_server
 
 def build_parser() -> argparse.ArgumentParser:
     return argparse.ArgumentParser(
-        description="Run the local CODESYS API HTTP server.",
+        description="Run the local codesys-tools HTTP server.",
     )
 
 
@@ -21,4 +21,3 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

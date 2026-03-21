@@ -13,8 +13,9 @@ def test_readme_states_public_support_boundary() -> None:
     assert "experimental" in readme
     assert "local CODESYS" in readme
     assert "named_pipe" in readme
-    assert "codesys-cli" in readme
-    assert "codesys-api-server" in readme
+    assert "codesys-tools" in readme
+    assert "codesys" in readme
+    assert "codesys-server" in readme
 
 
 def test_public_release_docs_link_current_public_entrypoints() -> None:
@@ -24,6 +25,6 @@ def test_public_release_docs_link_current_public_entrypoints() -> None:
     assert "python scripts\\check_public_release.py" in release_doc
     assert "Windows-only" in release_doc
     assert "experimental" in release_doc
-    assert "codesys-cli --help" in install_doc
-    assert "codesys-api-server --help" in install_doc
+    assert "codesys --help" in install_doc
+    assert "codesys-server --help" in install_doc
     assert "named_pipe" in install_doc

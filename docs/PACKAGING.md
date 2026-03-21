@@ -49,11 +49,11 @@ Expected artifacts:
 Recommended verification flow in a clean virtual environment:
 
 ```powershell
-python -m venv C:\Users\vboxuser\Desktop\codesys-api-wheel-smoke
-C:\Users\vboxuser\Desktop\codesys-api-wheel-smoke\Scripts\python.exe -m pip install --upgrade pip
-C:\Users\vboxuser\Desktop\codesys-api-wheel-smoke\Scripts\python.exe -m pip install dist\codesys_api-*.whl
-C:\Users\vboxuser\Desktop\codesys-api-wheel-smoke\Scripts\codesys-cli.exe --help
-C:\Users\vboxuser\Desktop\codesys-api-wheel-smoke\Scripts\codesys-api-server.exe --help
+python -m venv C:\Users\vboxuser\Desktop\codesys-tools-wheel-smoke
+C:\Users\vboxuser\Desktop\codesys-tools-wheel-smoke\Scripts\python.exe -m pip install --upgrade pip
+C:\Users\vboxuser\Desktop\codesys-tools-wheel-smoke\Scripts\python.exe -m pip install dist\codesys_tools-*.whl
+C:\Users\vboxuser\Desktop\codesys-tools-wheel-smoke\Scripts\codesys.exe --help
+C:\Users\vboxuser\Desktop\codesys-tools-wheel-smoke\Scripts\codesys-server.exe --help
 ```
 
 Installed package smoke should also confirm:
@@ -78,13 +78,13 @@ Then verify wheel install smoke in a clean environment.
 Install from a built wheel:
 
 ```powershell
-python -m pip install dist\codesys_api-*.whl
+python -m pip install dist\codesys_tools-*.whl
 ```
 
 Upgrade an existing installation:
 
 ```powershell
-python -m pip install --upgrade dist\codesys_api-*.whl
+python -m pip install --upgrade dist\codesys_tools-*.whl
 ```
 
 The formal internal release sequence is documented in [RELEASE.md](RELEASE.md).
@@ -94,8 +94,8 @@ The formal internal release sequence is documented in [RELEASE.md](RELEASE.md).
 - Windows-first only
 - `named_pipe` remains the only runtime transport
 - CLI entrypoints remain:
-  - `codesys-cli`
-  - `codesys-api-server`
+  - `codesys`
+  - `codesys-server`
 - This phase does **not** include:
   - PyPI publishing
   - installer generation

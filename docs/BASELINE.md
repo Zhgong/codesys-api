@@ -147,8 +147,8 @@ Expected result:
 - `dist/*.whl` exists
 - `dist/*.tar.gz` exists
 - clean wheel install smoke succeeds
-- installed `codesys-cli --help` succeeds
-- installed `codesys-api-server --help` succeeds
+- installed `codesys --help` succeeds
+- installed `codesys-server --help` succeeds
 - installed package assets resolve correctly
 
 ## Internal Release Gate

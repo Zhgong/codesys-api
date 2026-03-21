@@ -1,11 +1,11 @@
-# codesys-api
+# codesys-tools
 
 Windows-first, experimental local automation tooling for CODESYS.
 
-`codesys-api` provides:
+`codesys-tools` provides:
 
-- a local CLI: `codesys-cli`
-- a local HTTP server: `codesys-api-server`
+- a local CLI: `codesys`
+- a local HTTP server: `codesys-server`
 - a persistent CODESYS runtime built around `named_pipe`
 
 ## Support Boundary
@@ -35,7 +35,7 @@ For release artifacts:
 
 ```powershell
 python scripts\build_release.py
-python -m pip install dist\codesys_api-*.whl
+python -m pip install dist\codesys_tools-*.whl
 ```
 
 ## Required Environment
@@ -53,18 +53,18 @@ The CLI and server both use the same runtime wiring and packaged assets.
 CLI:
 
 ```powershell
-codesys-cli --help
-codesys-cli session start
-codesys-cli project create --path C:\work\demo.project
-codesys-cli project compile
-codesys-cli project close
-codesys-cli session stop
+codesys --help
+codesys session start
+codesys project create --path C:\work\demo.project
+codesys project compile
+codesys project close
+codesys session stop
 ```
 
 Server:
 
 ```powershell
-codesys-api-server --help
+codesys-server --help
 python HTTP_SERVER.py
 ```
 

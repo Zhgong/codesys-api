@@ -2,7 +2,7 @@
 
 ## Summary
 
-This checklist prepares `codesys-api` for a future public package release without uploading anything yet.
+This checklist prepares `codesys-tools` for a future public package release without uploading anything yet.
 
 Current target posture:
 
@@ -34,8 +34,8 @@ Before calling the package public-release-ready, verify that:
 
 - wheel and sdist build successfully
 - wheel filename matches the current `project.version`
-- installed `codesys-cli --help` succeeds
-- installed `codesys-api-server --help` succeeds
+- installed `codesys --help` succeeds
+- installed `codesys-server --help` succeeds
 - packaged `PERSISTENT_SESSION.py` resolves
 - packaged `ScriptLib/` resolves
 

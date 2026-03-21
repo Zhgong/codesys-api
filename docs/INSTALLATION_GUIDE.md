@@ -2,10 +2,10 @@
 
 ## Summary
 
-`codesys-api` is a Windows-first local package for automating CODESYS through:
+`codesys-tools` is a Windows-first local package for automating CODESYS through:
 
-- `codesys-cli`
-- `codesys-api-server`
+- `codesys`
+- `codesys-server`
 
 It assumes a local CODESYS installation is already present.
 
@@ -51,13 +51,13 @@ pip install .
 
 ```powershell
 python scripts\build_release.py
-python -m pip install dist\codesys_api-*.whl
+python -m pip install dist\codesys_tools-*.whl
 ```
 
 Upgrade an existing installation:
 
 ```powershell
-python -m pip install --upgrade dist\codesys_api-*.whl
+python -m pip install --upgrade dist\codesys_tools-*.whl
 ```
 
 ## Verify The Installation
@@ -65,14 +65,14 @@ python -m pip install --upgrade dist\codesys_api-*.whl
 CLI:
 
 ```powershell
-codesys-cli --help
-codesys-cli --json session status
+codesys --help
+codesys --json session status
 ```
 
 Server:
 
 ```powershell
-codesys-api-server --help
+codesys-server --help
 ```
 
 Repo-local compatibility entrypoints:
@@ -85,11 +85,11 @@ python HTTP_SERVER.py --help
 ## Minimal Local Smoke
 
 ```powershell
-codesys-cli session start
-codesys-cli project create --path C:\work\demo.project
-codesys-cli project compile
-codesys-cli project close
-codesys-cli session stop
+codesys session start
+codesys project create --path C:\work\demo.project
+codesys project compile
+codesys project close
+codesys session stop
 ```
 
 ## Common Setup Problems

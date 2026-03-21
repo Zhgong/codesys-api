@@ -20,8 +20,8 @@ The single version source is `pyproject.toml`:
 
 Release artifacts must match that version:
 
-- `dist/codesys_api-<version>-*.whl`
-- `dist/codesys_api-<version>.tar.gz`
+- `dist/codesys_tools-<version>-*.whl`
+- `dist/codesys_tools-<version>.tar.gz`
 
 ## Release Checklist
 
@@ -35,11 +35,11 @@ python scripts\build_release.py
 Then verify the wheel in a clean virtual environment:
 
 ```powershell
-python -m venv C:\Users\vboxuser\Desktop\codesys-api-wheel-smoke
-C:\Users\vboxuser\Desktop\codesys-api-wheel-smoke\Scripts\python.exe -m pip install --upgrade pip
-C:\Users\vboxuser\Desktop\codesys-api-wheel-smoke\Scripts\python.exe -m pip install dist\codesys_api-*.whl
-C:\Users\vboxuser\Desktop\codesys-api-wheel-smoke\Scripts\codesys-cli.exe --help
-C:\Users\vboxuser\Desktop\codesys-api-wheel-smoke\Scripts\codesys-api-server.exe --help
+python -m venv C:\Users\vboxuser\Desktop\codesys-tools-wheel-smoke
+C:\Users\vboxuser\Desktop\codesys-tools-wheel-smoke\Scripts\python.exe -m pip install --upgrade pip
+C:\Users\vboxuser\Desktop\codesys-tools-wheel-smoke\Scripts\python.exe -m pip install dist\codesys_tools-*.whl
+C:\Users\vboxuser\Desktop\codesys-tools-wheel-smoke\Scripts\codesys.exe --help
+C:\Users\vboxuser\Desktop\codesys-tools-wheel-smoke\Scripts\codesys-server.exe --help
 ```
 
 Installed package validation must also confirm:
@@ -60,13 +60,13 @@ Recommended internal handoff bundle:
 Install from a wheel:
 
 ```powershell
-python -m pip install dist\codesys_api-*.whl
+python -m pip install dist\codesys_tools-*.whl
 ```
 
 Upgrade an existing installation:
 
 ```powershell
-python -m pip install --upgrade dist\codesys_api-*.whl
+python -m pip install --upgrade dist\codesys_tools-*.whl
 ```
 
 ## Release Record

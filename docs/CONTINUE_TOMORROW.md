@@ -75,10 +75,10 @@ Internal release proof now includes:
 - `pip install .` works
 - `python scripts\build_release.py` works
 - `dist/*.whl` and `dist/*.tar.gz` are produced
-- `codesys-cli --help` works
-- `codesys-api-server --help` works
-- installed `codesys-cli --help` works from a clean venv
-- installed `codesys-api-server --help` works from a clean venv
+- `codesys --help` works
+- `codesys-server --help` works
+- installed `codesys --help` works from a clean venv
+- installed `codesys-server --help` works from a clean venv
 - installed package assets resolve correctly
 - internal release docs exist:
   - `docs/RELEASE.md`

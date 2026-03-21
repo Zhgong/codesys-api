@@ -25,11 +25,11 @@ class ActionServiceLike(Protocol):
 def _build_usage_examples() -> str:
     return (
         "Examples:\n"
-        "  codesys-cli session start\n"
-        "  codesys-cli project create --path C:\\work\\demo.project\n"
-        "  codesys-cli pou create --name MotorController --type FunctionBlock --language ST\n"
-        "  codesys-cli project compile --clean-build\n"
-        "  codesys-cli --json session status\n\n"
+        "  codesys session start\n"
+        "  codesys project create --path C:\\work\\demo.project\n"
+        "  codesys pou create --name MotorController --type FunctionBlock --language ST\n"
+        "  codesys project compile --clean-build\n"
+        "  codesys --json session status\n\n"
         "Notes:\n"
         "  Transport: named_pipe only\n"
         "  Default output: human-readable text\n"
@@ -41,35 +41,35 @@ def _build_usage_examples() -> str:
 def _build_session_help_examples() -> str:
     return (
         "Examples:\n"
-        "  codesys-cli session start\n"
-        "  codesys-cli session status\n"
-        "  codesys-cli session restart\n"
-        "  codesys-cli session stop"
+        "  codesys session start\n"
+        "  codesys session status\n"
+        "  codesys session restart\n"
+        "  codesys session stop"
     )
 
 
 def _build_project_help_examples() -> str:
     return (
         "Examples:\n"
-        "  codesys-cli project create --path C:\\work\\demo.project\n"
-        "  codesys-cli project save\n"
-        "  codesys-cli project compile --clean-build\n"
-        "  codesys-cli project close"
+        "  codesys project create --path C:\\work\\demo.project\n"
+        "  codesys project save\n"
+        "  codesys project compile --clean-build\n"
+        "  codesys project close"
     )
 
 
 def _build_pou_help_examples() -> str:
     return (
         "Examples:\n"
-        "  codesys-cli pou create --name MotorController --type FunctionBlock --language ST\n"
-        "  codesys-cli pou list --parent-path Application\n"
-        "  codesys-cli pou code --path Application\\PLC_PRG --implementation-file plc_prg_impl.txt"
+        "  codesys pou create --name MotorController --type FunctionBlock --language ST\n"
+        "  codesys pou list --parent-path Application\n"
+        "  codesys pou code --path Application\\PLC_PRG --implementation-file plc_prg_impl.txt"
     )
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="CODESYS API command line interface (named_pipe only)",
+        description="codesys-tools command line interface (named_pipe only)",
         epilog=_build_usage_examples(),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )

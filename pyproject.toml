@@ -3,17 +3,17 @@ requires = ["setuptools>=70", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "codesys-api"
+name = "codesys-tools"
 version = "0.1.0"
-description = "Windows-first CODESYS automation server and local CLI"
+description = "Windows-first CODESYS automation tools with a local CLI and HTTP server"
 readme = "README.md"
 requires-python = ">=3.14"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [
-    { name = "codesys-api maintainers" },
+    { name = "codesys-tools maintainers" },
 ]
-keywords = ["codesys", "plc", "industrial-automation", "cli", "rest-api"]
+keywords = ["codesys", "plc", "industrial-automation", "cli", "tooling"]
 dependencies = [
     "requests",
     "pywin32",
@@ -34,8 +34,8 @@ Issues = "https://github.com/Zhgong/codesys-api/issues"
 Documentation = "https://github.com/Zhgong/codesys-api/tree/main/docs"
 
 [project.scripts]
-codesys-cli = "codesys_api.cli_entry:main"
-codesys-api-server = "codesys_api.server_entry:main"
+codesys = "codesys_api.cli_entry:main"
+codesys-server = "codesys_api.server_entry:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

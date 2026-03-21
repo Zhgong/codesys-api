@@ -16,7 +16,7 @@ PYPROJECT_PATH = REPO_ROOT / "pyproject.toml"
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Build wheel and sdist release artifacts for codesys-api.",
+        description="Build wheel and sdist release artifacts for codesys-tools.",
     )
     parser.add_argument(
         "--keep-existing",

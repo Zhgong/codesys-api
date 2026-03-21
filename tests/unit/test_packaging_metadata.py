@@ -10,9 +10,9 @@ def test_pyproject_defines_build_backend_and_console_scripts() -> None:
     pyproject = (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
 
     assert 'build-backend = "setuptools.build_meta"' in pyproject
-    assert 'name = "codesys-api"' in pyproject
-    assert 'codesys-cli = "codesys_api.cli_entry:main"' in pyproject
-    assert 'codesys-api-server = "codesys_api.server_entry:main"' in pyproject
+    assert 'name = "codesys-tools"' in pyproject
+    assert 'codesys = "codesys_api.cli_entry:main"' in pyproject
+    assert 'codesys-server = "codesys_api.server_entry:main"' in pyproject
     assert 'authors = [' in pyproject
     assert 'keywords = [' in pyproject
     assert '[project.urls]' in pyproject
