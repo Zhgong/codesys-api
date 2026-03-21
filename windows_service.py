@@ -24,6 +24,7 @@ import sys
 import os
 import logging
 import time
+from pathlib import Path
 import servicemanager
 import win32event
 import win32service
@@ -36,10 +37,13 @@ except ImportError:
     from BaseHTTPServer import HTTPServer
 
 # Setup logging for the Windows service
+SERVICE_LOG_DIR = Path(__file__).resolve().parent / "artifacts" / "runtime"
+SERVICE_LOG_DIR.mkdir(parents=True, exist_ok=True)
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    filename='codesys_api_service.log'
+    filename=str(SERVICE_LOG_DIR / "codesys_api_service.log")
 )
 logger = logging.getLogger('codesys_api_service')
 

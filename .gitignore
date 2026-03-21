@@ -3,6 +3,8 @@
 __pycache__/
 *.py[cod]
 *$py.class
+.pytest_cache/
+.mypy_cache/
 
 # Virtual environment
 venv/
@@ -24,6 +26,8 @@ api_keys.json
 # Temporary directories
 requests/
 results/
+artifacts/generated/
+artifacts/runtime/
 
 # Session status file
 session_status.json
@@ -37,6 +41,20 @@ tmp/
 *.tmp
 *.bak
 *.swp
+*.~u
+*.precompilecache
+*-AllUsers.opt
+*-*-*.opt
+real_smoke_*.project
+real_server_stdout.log
+real_server_stderr.log
+
+# Local pytest temp roots that can pick up Windows ACL oddities
+.pytest-tmp/
+.pytest-tmp-run/
+manual_pytest_tmp/
+pytesttmp_abs/
+tmpc5ph5jfm/
 
 # Windows service-related
 *.exe
@@ -54,3 +72,7 @@ tmp/
 .DS_Store
 Thumbs.db
 **/.claude/settings.local.json
+
+
+AGENTS.md
+GEMINI.md

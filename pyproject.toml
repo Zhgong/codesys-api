@@ -1,0 +1,94 @@
+[build-system]
+requires = ["setuptools>=70", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "codesys-tools"
+version = "0.1.0"
+description = "Windows-first CODESYS automation tools with a local CLI and HTTP server"
+readme = "README.md"
+requires-python = ">=3.14"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [
+    { name = "codesys-tools maintainers" },
+]
+keywords = ["codesys", "plc", "industrial-automation", "cli", "tooling"]
+dependencies = [
+    "requests",
+    "pywin32",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Operating System :: Microsoft :: Windows",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Scientific/Engineering",
+]
+
+[project.urls]
+Homepage = "https://github.com/Zhgong/codesys-api"
+Repository = "https://github.com/Zhgong/codesys-api"
+Issues = "https://github.com/Zhgong/codesys-api/issues"
+Documentation = "https://github.com/Zhgong/codesys-api/tree/main/docs"
+
+[project.scripts]
+codesys = "codesys_api.cli_entry:main"
+codesys-server = "codesys_api.server_entry:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+codesys_api = [
+    "py.typed",
+    "assets/PERSISTENT_SESSION.py",
+    "assets/ScriptLib/**/*",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-ra"
+markers = [
+    "mock: tests that exercise the mock HTTP server without a CODESYS installation",
+    "codesys: tests that require a real CODESYS installation",
+    "codesys_main: fast real-CODESYS acceptance path that minimizes cold starts",
+    "codesys_slow: slower real-CODESYS runtime hardening checks",
+]
+
+[tool.mypy]
+python_version = "3.14"
+strict = true
+warn_unused_configs = true
+mypy_path = ["src"]
+exclude = "^src/codesys_api/assets/"
+files = [
+    "_repo_bootstrap.py",
+    "src/codesys_api",
+    "codesys_cli.py",
+    "HTTP_SERVER.py",
+    "scripts/dev/test_server.py",
+    "scripts/build_release.py",
+    "scripts/check_public_release.py",
+    "scripts/run_baseline.py",
+    "tests/integration",
+    "tests/unit",
+    "tests/e2e/codesys",
+    "tests/e2e/mock",
+]
+
+[[tool.mypy.overrides]]
+module = [
+    "HTTP_SERVER",
+    "PERSISTENT_SESSION",
+    "test_server",
+    "codesys_api.http_server",
+    "codesys_api.server_entry",
+]
+ignore_errors = true
