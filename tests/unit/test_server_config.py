@@ -6,7 +6,8 @@ from server_config import load_server_config
 
 
 def test_load_server_config_uses_current_repo_defaults(tmp_path: Path) -> None:
-    config = load_server_config(tmp_path, {})
+    appdata = tmp_path / "AppData"
+    config = load_server_config(tmp_path, {"APPDATA": str(appdata)})
 
     assert config.server_host == "0.0.0.0"
     assert config.server_port == 8080
@@ -31,9 +32,9 @@ def test_load_server_config_uses_current_repo_defaults(tmp_path: Path) -> None:
         "pipe_name": "codesys_api_session",
     }
     assert config.script_dir == tmp_path
-    assert config.persistent_script == tmp_path / "PERSISTENT_SESSION.py"
-    assert config.api_key_file == tmp_path / "api_keys.json"
-    assert config.script_lib_dir == tmp_path / "codesys_assets" / "ScriptLib"
+    assert config.persistent_script == REPO_ROOT / "src" / "codesys_api" / "assets" / "PERSISTENT_SESSION.py"
+    assert config.api_key_file == appdata / "codesys-api" / "api_keys.json"
+    assert config.script_lib_dir == REPO_ROOT / "src" / "codesys_api" / "assets" / "ScriptLib"
 
 
 def test_load_server_config_accepts_environment_overrides(tmp_path: Path) -> None:
@@ -120,3 +121,6 @@ def test_load_server_config_auto_discovers_single_profile(tmp_path: Path) -> Non
 
     assert config.codesys_profile_path == discovered_profile
     assert config.codesys_profile_name == "CODESYS V3.5 SP20 Patch 5"
+
+
+REPO_ROOT = Path(__file__).resolve().parents[2]

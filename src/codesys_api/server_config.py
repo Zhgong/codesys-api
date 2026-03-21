@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from .runtime_paths import default_api_key_file, packaged_persistent_script, packaged_script_lib_dir
+
 
 DEFAULT_SERVER_HOST = "0.0.0.0"
 DEFAULT_SERVER_PORT = 8080
@@ -139,7 +141,7 @@ def load_server_config(base_dir: Path, env: Mapping[str, str]) -> ServerConfig:
         transport_name=transport_name,
         pipe_name=pipe_name,
         script_dir=base_dir,
-        persistent_script=base_dir / "PERSISTENT_SESSION.py",
-        api_key_file=base_dir / "api_keys.json",
-        script_lib_dir=base_dir / "codesys_assets" / "ScriptLib",
+        persistent_script=packaged_persistent_script(),
+        api_key_file=default_api_key_file(env),
+        script_lib_dir=packaged_script_lib_dir(),
     )

@@ -1,0 +1,25 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+def test_pyproject_defines_build_backend_and_console_scripts() -> None:
+    pyproject = (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+
+    assert 'build-backend = "setuptools.build_meta"' in pyproject
+    assert 'name = "codesys-api"' in pyproject
+    assert 'codesys-cli = "codesys_api.cli_entry:main"' in pyproject
+    assert 'codesys-api-server = "codesys_api.server_entry:main"' in pyproject
+
+
+def test_root_wrappers_delegate_to_package_entrypoints() -> None:
+    cli_wrapper = (REPO_ROOT / "codesys_cli.py").read_text(encoding="utf-8")
+    server_wrapper = (REPO_ROOT / "HTTP_SERVER.py").read_text(encoding="utf-8")
+
+    assert 'alias_module(__name__, "codesys_api.cli_entry")' in cli_wrapper
+    assert 'from codesys_api.cli_entry import main' in cli_wrapper
+    assert 'alias_module(__name__, "codesys_api.http_server")' in server_wrapper
+    assert 'from codesys_api.http_server import main' in server_wrapper

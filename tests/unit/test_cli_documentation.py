@@ -47,7 +47,8 @@ def test_cli_usage_examples_match_parser() -> None:
     usage = (REPO_ROOT / "CLI_USAGE.md").read_text(encoding="utf-8")
 
     for args in examples:
-        command = "python codesys_cli.py " + " ".join(args)
-        assert command in usage
+        package_command = "codesys-cli " + " ".join(args)
+        repo_command = "python codesys_cli.py " + " ".join(args)
+        assert package_command in usage or repo_command in usage
         parsed = parser.parse_args(args)
         assert parsed.resource == args[0]

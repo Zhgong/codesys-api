@@ -15,19 +15,20 @@ CLI is complete enough for normal local use:
 - local entrypoints and usage docs are in place
 - real CLI positive and negative smoke paths exist
 
-The baseline phase is complete, and the current active line is now repo reorganization:
+The baseline and repo-reorg phases are complete:
 
 - core host-side implementation now lives under `src/codesys_api/`
-- long-lived documents are moving under `docs/`
-- debug and diagnostic helpers are moving under `scripts/debug/`
+- long-lived documents now live under `docs/`
+- debug and diagnostic helpers now live under `scripts/debug/`
 - runtime stub assets now live under `codesys_assets/`
-- root entrypoints remain compatible while the internal layout is cleaned up
+- root entrypoints remain compatible through thin wrapper modules
 
 Latest stable checkpoints:
 
 - `3a16ec9` completed transport cleanup and established the local CLI
 - `8e0d4d3` replaced file-based session logs with a runtime buffer
 - `75d84b4` established the repository baseline
+- `8e95c68` reorganized the repository into a structured layout
 
 ## Verification Status
 
@@ -41,7 +42,7 @@ Expected results at handoff:
 
 - `pytest`: `150 passed, 8 skipped`
 - `mypy`: success with no issues in `44` source files
-- `git status --short`: expected to show the repo-reorg batch until it is committed
+- `git status --short`: should only show `M CONTINUE_TOMORROW.md` until this handoff note is committed
 
 Real validation already confirmed:
 
@@ -58,7 +59,7 @@ Real validation already confirmed:
   - `session stop`
 - CLI negative compile detection works when breaking `Application\PLC_PRG`
 
-This round did not rerun real CODESYS acceptance. The baseline documents the current real acceptance commands and expectations, but local gates were the required proof for this phase.
+This round did not rerun real CODESYS acceptance. The baseline still documents the current real acceptance commands and expectations, but the required proof for the reorg phase was the local baseline gate.
 
 ## Important Constraints
 
@@ -75,8 +76,11 @@ This round did not rerun real CODESYS acceptance. The baseline documents the cur
 1. Treat repo reorganization as the active major phase.
 2. Keep root entrypoints compatible while moving internal code and long-lived assets into their structured directories.
 3. Run `python scripts\run_baseline.py` after each structural slice.
-4. Do not reopen transport or lifecycle work unless the reorg exposes a regression.
-5. The next stage after this one should be packaging (`pip install .`), not more flat-root cleanup for its own sake.
+4. Do not reopen transport or lifecycle work unless packaging exposes a regression.
+5. The next active stage should be packaging:
+   - make `pip install .` work on the reorganized layout
+   - add formal console entrypoints
+   - make runtime asset lookup work without relying on repo-root assumptions
 
 ## Quick Resume Checklist
 

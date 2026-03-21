@@ -4,7 +4,7 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-PERSISTENT_SESSION = REPO_ROOT / "PERSISTENT_SESSION.py"
+PERSISTENT_SESSION = REPO_ROOT / "src" / "codesys_api" / "assets" / "PERSISTENT_SESSION.py"
 
 
 def read_source() -> str:

@@ -38,6 +38,7 @@ class ApiKeyManager:
         return {}
 
     def _save_keys(self, keys: dict[str, ApiKeyMetadata]) -> None:
+        self.key_file_path.parent.mkdir(parents=True, exist_ok=True)
         self.key_file_path.write_text(json.dumps(keys), encoding="utf-8")
 
     def validate_key(self, key: str) -> bool:
