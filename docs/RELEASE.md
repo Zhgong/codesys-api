@@ -44,8 +44,8 @@ Then verify the wheel in a clean virtual environment:
 python -m venv C:\Users\vboxuser\Desktop\codesys-tools-wheel-smoke
 C:\Users\vboxuser\Desktop\codesys-tools-wheel-smoke\Scripts\python.exe -m pip install --upgrade pip
 C:\Users\vboxuser\Desktop\codesys-tools-wheel-smoke\Scripts\python.exe -m pip install dist\codesys_tools-*.whl
-C:\Users\vboxuser\Desktop\codesys-tools-wheel-smoke\Scripts\codesys.exe --help
-C:\Users\vboxuser\Desktop\codesys-tools-wheel-smoke\Scripts\codesys-server.exe --help
+C:\Users\vboxuser\Desktop\codesys-tools-wheel-smoke\Scripts\codesys-tools.exe --help
+C:\Users\vboxuser\Desktop\codesys-tools-wheel-smoke\Scripts\codesys-tools-server.exe --help
 ```
 
 GitHub-hosted equivalent:

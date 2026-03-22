@@ -53,7 +53,7 @@ The repository layout has already shifted away from the flat root:
 - long-lived documents are moving into `docs/`
 - debug and diagnostic helpers are moving into `scripts/debug/`
 - root entrypoints remain temporarily for compatibility
-- installation entrypoints now exist via `codesys` and `codesys-server`
+- installation entrypoints now exist via `codesys-tools` and `codesys-tools-server`
 
 ## Target Architecture
 

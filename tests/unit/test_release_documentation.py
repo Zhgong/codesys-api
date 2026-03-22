@@ -11,8 +11,8 @@ def test_release_document_references_internal_flow_commands() -> None:
 
     assert "python scripts\\run_baseline.py" in release_doc
     assert "python scripts\\build_release.py" in release_doc
-    assert "codesys" in release_doc
-    assert "codesys-server" in release_doc
+    assert "codesys-tools" in release_doc
+    assert "codesys-tools-server" in release_doc
     assert "dist\\codesys_tools-*.whl" in release_doc
     assert "RELEASE_NOTES.md" in release_doc
     assert ".github/workflows/ci.yml" in release_doc

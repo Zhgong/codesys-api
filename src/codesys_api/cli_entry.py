@@ -25,11 +25,11 @@ class ActionServiceLike(Protocol):
 def _build_usage_examples() -> str:
     return (
         "Examples:\n"
-        "  codesys session start\n"
-        "  codesys project create --path C:\\work\\demo.project\n"
-        "  codesys pou create --name MotorController --type FunctionBlock --language ST\n"
-        "  codesys project compile --clean-build\n"
-        "  codesys --json session status\n\n"
+        "  codesys-tools session start\n"
+        "  codesys-tools project create --path C:\\work\\demo.project\n"
+        "  codesys-tools pou create --name MotorController --type FunctionBlock --language ST\n"
+        "  codesys-tools project compile --clean-build\n"
+        "  codesys-tools --json session status\n\n"
         "Notes:\n"
         "  Transport: named_pipe only\n"
         "  Default output: human-readable text\n"
@@ -41,29 +41,29 @@ def _build_usage_examples() -> str:
 def _build_session_help_examples() -> str:
     return (
         "Examples:\n"
-        "  codesys session start\n"
-        "  codesys session status\n"
-        "  codesys session restart\n"
-        "  codesys session stop"
+        "  codesys-tools session start\n"
+        "  codesys-tools session status\n"
+        "  codesys-tools session restart\n"
+        "  codesys-tools session stop"
     )
 
 
 def _build_project_help_examples() -> str:
     return (
         "Examples:\n"
-        "  codesys project create --path C:\\work\\demo.project\n"
-        "  codesys project save\n"
-        "  codesys project compile --clean-build\n"
-        "  codesys project close"
+        "  codesys-tools project create --path C:\\work\\demo.project\n"
+        "  codesys-tools project save\n"
+        "  codesys-tools project compile --clean-build\n"
+        "  codesys-tools project close"
     )
 
 
 def _build_pou_help_examples() -> str:
     return (
         "Examples:\n"
-        "  codesys pou create --name MotorController --type FunctionBlock --language ST\n"
-        "  codesys pou list --parent-path Application\n"
-        "  codesys pou code --path Application\\PLC_PRG --implementation-file plc_prg_impl.txt"
+        "  codesys-tools pou create --name MotorController --type FunctionBlock --language ST\n"
+        "  codesys-tools pou list --parent-path Application\n"
+        "  codesys-tools pou code --path Application\\PLC_PRG --implementation-file plc_prg_impl.txt"
     )
 
 

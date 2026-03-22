@@ -52,8 +52,8 @@ Recommended verification flow in a clean virtual environment:
 python -m venv C:\Users\vboxuser\Desktop\codesys-tools-wheel-smoke
 C:\Users\vboxuser\Desktop\codesys-tools-wheel-smoke\Scripts\python.exe -m pip install --upgrade pip
 C:\Users\vboxuser\Desktop\codesys-tools-wheel-smoke\Scripts\python.exe -m pip install dist\codesys_tools-*.whl
-C:\Users\vboxuser\Desktop\codesys-tools-wheel-smoke\Scripts\codesys.exe --help
-C:\Users\vboxuser\Desktop\codesys-tools-wheel-smoke\Scripts\codesys-server.exe --help
+C:\Users\vboxuser\Desktop\codesys-tools-wheel-smoke\Scripts\codesys-tools.exe --help
+C:\Users\vboxuser\Desktop\codesys-tools-wheel-smoke\Scripts\codesys-tools-server.exe --help
 ```
 
 Installed package smoke should also confirm:
@@ -94,8 +94,8 @@ The formal internal release sequence is documented in [RELEASE.md](RELEASE.md).
 - Windows-first only
 - `named_pipe` remains the only runtime transport
 - CLI entrypoints remain:
-  - `codesys`
-  - `codesys-server`
+  - `codesys-tools`
+  - `codesys-tools-server`
 - This phase does **not** include:
   - PyPI publishing
   - installer generation

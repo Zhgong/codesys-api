@@ -56,8 +56,8 @@ def _validate_public_docs() -> None:
     assert_contains(README_PATH, "local CODESYS")
     assert_contains(README_PATH, "named_pipe")
     assert_contains(PUBLIC_RELEASE_DOC, r"python scripts\check_public_release.py")
-    assert_contains(INSTALLATION_GUIDE, "codesys --help")
-    assert_contains(INSTALLATION_GUIDE, "codesys-server --help")
+    assert_contains(INSTALLATION_GUIDE, "codesys-tools --help")
+    assert_contains(INSTALLATION_GUIDE, "codesys-tools-server --help")
     assert_contains(PYPROJECT_PATH, 'name = "codesys-tools"')
     assert_contains(PYPROJECT_PATH, 'Homepage = "https://github.com/Zhgong/codesys-api"')
     assert_contains(PYPROJECT_PATH, 'Development Status :: 3 - Alpha')
@@ -81,8 +81,8 @@ def main() -> int:
     _create_clean_venv()
     run_step("upgrade pip", [str(_venv_python()), "-m", "pip", "install", "--upgrade", "pip"])
     run_step("install wheel", [str(_venv_python()), "-m", "pip", "install", str(_wheel_path())])
-    run_step("codesys --help", [str(_venv_script("codesys.exe")), "--help"])
-    run_step("codesys-server --help", [str(_venv_script("codesys-server.exe")), "--help"])
+    run_step("codesys-tools --help", [str(_venv_script("codesys-tools.exe")), "--help"])
+    run_step("codesys-tools-server --help", [str(_venv_script("codesys-tools-server.exe")), "--help"])
     _validate_installed_assets()
     return 0
 

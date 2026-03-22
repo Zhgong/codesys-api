@@ -4,8 +4,8 @@ Windows-first, experimental local automation tooling for CODESYS.
 
 `codesys-tools` provides:
 
-- a local CLI: `codesys`
-- a local HTTP server: `codesys-server`
+- a local CLI: `codesys-tools`
+- a local HTTP server: `codesys-tools-server`
 - a persistent CODESYS runtime built around `named_pipe`
 
 ## Support Boundary
@@ -53,18 +53,18 @@ The CLI and server both use the same runtime wiring and packaged assets.
 CLI:
 
 ```powershell
-codesys --help
-codesys session start
-codesys project create --path C:\work\demo.project
-codesys project compile
-codesys project close
-codesys session stop
+codesys-tools --help
+codesys-tools session start
+codesys-tools project create --path C:\work\demo.project
+codesys-tools project compile
+codesys-tools project close
+codesys-tools session stop
 ```
 
 Server:
 
 ```powershell
-codesys-server --help
+codesys-tools-server --help
 python HTTP_SERVER.py
 ```
 

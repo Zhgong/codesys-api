@@ -12,8 +12,8 @@
   - wheel and sdist are produced
   - clean wheel-install smoke passes
 - Installed entrypoints verified:
-  - `codesys`
-  - `codesys-server`
+  - `codesys-tools`
+  - `codesys-tools-server`
 - Installed packaged assets verified:
   - `PERSISTENT_SESSION.py`
   - `ScriptLib/`

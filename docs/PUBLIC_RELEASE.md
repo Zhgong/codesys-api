@@ -41,8 +41,8 @@ Before calling the package public-release-ready, verify that:
 
 - wheel and sdist build successfully
 - wheel filename matches the current `project.version`
-- installed `codesys --help` succeeds
-- installed `codesys-server --help` succeeds
+- installed `codesys-tools --help` succeeds
+- installed `codesys-tools-server --help` succeeds
 - packaged `PERSISTENT_SESSION.py` resolves
 - packaged `ScriptLib/` resolves
 

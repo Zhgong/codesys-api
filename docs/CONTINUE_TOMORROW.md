@@ -79,10 +79,10 @@ Internal release proof now includes:
 - `pip install .` works
 - `python scripts\build_release.py` works
 - `dist/*.whl` and `dist/*.tar.gz` are produced
-- `codesys --help` works
-- `codesys-server --help` works
-- installed `codesys --help` works from a clean venv
-- installed `codesys-server --help` works from a clean venv
+- `codesys-tools --help` works
+- `codesys-tools-server --help` works
+- installed `codesys-tools --help` works from a clean venv
+- installed `codesys-tools-server --help` works from a clean venv
 - installed package assets resolve correctly
 - internal release docs exist:
   - `docs/RELEASE.md`
@@ -96,8 +96,8 @@ Public release prep now adds:
 - public release checklist exists
 - package name is now `codesys-tools`
 - installed entrypoints are now:
-  - `codesys`
-  - `codesys-server`
+  - `codesys-tools`
+  - `codesys-tools-server`
 - GitHub Actions workflows now exist for:
   - CI on `master`
   - manual release builds
