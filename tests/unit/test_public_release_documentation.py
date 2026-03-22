@@ -26,6 +26,7 @@ def test_public_release_docs_link_current_public_entrypoints() -> None:
     assert "Windows-only" in release_doc
     assert "experimental" in release_doc
     assert ".github/workflows/publish.yml" in release_doc
+    assert ".github/workflows/verify-published-package.yml" in release_doc
     assert "Trusted Publishing" in release_doc
     assert "codesys-tools --help" in install_doc
     assert "codesys-tools-server --help" in install_doc

@@ -25,8 +25,8 @@ python scripts\run_baseline.py
 
 Current expected result:
 
-- `pytest`: `167 passed, 8 skipped`
-- `mypy`: success with no issues in `58` source files
+- `pytest`: `170 passed, 8 skipped`
+- `mypy`: success with no issues in `60` source files
 - `py_compile`: success
 
 ## Contract Baseline

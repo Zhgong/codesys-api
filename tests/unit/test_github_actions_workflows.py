@@ -37,3 +37,16 @@ def test_publish_workflow_uses_manual_targeted_trusted_publishing() -> None:
     assert "id-token: write" in workflow
     assert "pypa/gh-action-pypi-publish@release/v1" in workflow
     assert "https://test.pypi.org/legacy/" in workflow
+
+
+def test_verify_published_package_workflow_installs_exact_target_version() -> None:
+    workflow = (REPO_ROOT / ".github" / "workflows" / "verify-published-package.yml").read_text(
+        encoding="utf-8"
+    )
+
+    assert "workflow_dispatch:" in workflow
+    assert "testpypi" in workflow
+    assert "pypi" in workflow
+    assert "version:" in workflow
+    assert "windows-latest" in workflow
+    assert r"python scripts\verify_installed_package.py" in workflow
