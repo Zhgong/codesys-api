@@ -110,6 +110,12 @@ The baseline runner now also protects the current reorg direction:
 - runtime stub assets live under `src/codesys_api/assets/`
 - long-lived docs live under `docs/`
 
+Python compatibility policy:
+
+- public support target is Python 3.13+
+- GitHub CI validates 3.13 and 3.14
+- release and publish workflows remain pinned to Python 3.14
+
 Real CODESYS baseline remains opt-in and requires the existing environment variables:
 
 - `CODESYS_E2E_ENABLE=1`

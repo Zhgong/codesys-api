@@ -28,6 +28,8 @@ def test_public_release_docs_link_current_public_entrypoints() -> None:
     assert ".github/workflows/publish.yml" in release_doc
     assert ".github/workflows/verify-published-package.yml" in release_doc
     assert "Trusted Publishing" in release_doc
+    assert "Python 3.13+" in release_doc
+    assert "Python 3.13+" in install_doc
     assert "codesys-tools --help" in install_doc
     assert "codesys-tools-server --help" in install_doc
     assert "named_pipe" in install_doc

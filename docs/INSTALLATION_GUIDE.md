@@ -27,7 +27,7 @@ This guide does not cover:
 ## Prerequisites
 
 - Windows
-- Python 3.14+
+- Python 3.13+
 - CODESYS installed locally
 - a valid CODESYS profile available on disk
 
