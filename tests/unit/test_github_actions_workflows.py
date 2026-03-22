@@ -19,6 +19,7 @@ def test_ci_workflow_runs_baseline_build_and_public_gate_on_master() -> None:
     assert r"python scripts\run_baseline.py" in workflow
     assert r"python scripts\build_release.py" in workflow
     assert r"python scripts\check_public_release.py" in workflow
+    assert "if: matrix.python-version == '3.14'" in workflow
 
 
 def test_release_build_workflow_uploads_dist_and_writes_summary() -> None:
