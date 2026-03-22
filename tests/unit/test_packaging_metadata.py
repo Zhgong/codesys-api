@@ -11,7 +11,7 @@ def test_pyproject_defines_build_backend_and_console_scripts() -> None:
 
     assert 'build-backend = "setuptools.build_meta"' in pyproject
     assert 'name = "codesys-tools"' in pyproject
-    assert 'version = "0.2.0"' in pyproject
+    assert 'version = "0.2.1"' in pyproject
     assert 'requires-python = ">=3.13"' in pyproject
     assert 'codesys-tools = "codesys_api.cli_entry:main"' in pyproject
     assert 'codesys-tools-server = "codesys_api.server_entry:main"' in pyproject
