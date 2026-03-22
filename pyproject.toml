@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "codesys-tools"
-version = "0.1.0"
+version = "0.2.0"
 description = "Windows-first CODESYS automation tools with a local CLI and HTTP server"
 readme = "README.md"
 requires-python = ">=3.14"
@@ -34,8 +34,8 @@ Issues = "https://github.com/Zhgong/codesys-api/issues"
 Documentation = "https://github.com/Zhgong/codesys-api/tree/main/docs"
 
 [project.scripts]
-codesys = "codesys_api.cli_entry:main"
-codesys-server = "codesys_api.server_entry:main"
+codesys-tools = "codesys_api.cli_entry:main"
+codesys-tools-server = "codesys_api.server_entry:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
@@ -76,6 +76,7 @@ files = [
     "scripts/dev/test_server.py",
     "scripts/build_release.py",
     "scripts/check_public_release.py",
+    "scripts/verify_installed_package.py",
     "scripts/run_baseline.py",
     "tests/integration",
     "tests/unit",

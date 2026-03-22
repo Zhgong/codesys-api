@@ -13,8 +13,8 @@ def test_public_release_gate_runs_baseline_build_and_wheel_smoke() -> None:
     assert 'run_step("build"' in script
     assert 'scripts\\run_baseline.py' in script
     assert 'scripts\\build_release.py' in script
-    assert "codesys.exe" in script
-    assert "codesys-server.exe" in script
+    assert "codesys-tools.exe" in script
+    assert "codesys-tools-server.exe" in script
     assert "public_release_smoke" in script
 
 

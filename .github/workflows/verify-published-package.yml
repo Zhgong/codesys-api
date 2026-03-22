@@ -1,0 +1,35 @@
+name: Verify Published Package
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Verification target"
+        required: true
+        type: choice
+        options:
+          - testpypi
+          - pypi
+      version:
+        description: "Published package version to install"
+        required: true
+        type: string
+
+jobs:
+  verify:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Verify published package install and entrypoints
+        run: >
+          python scripts\verify_installed_package.py
+          --target ${{ inputs.target }}
+          --version ${{ inputs.version }}

@@ -6,8 +6,8 @@ The repository now provides a local CLI entrypoint on top of the shared action l
 
 Supported entrypoints:
 
-- `codesys ...`
-- `codesys-server ...`
+- `codesys-tools ...`
+- `codesys-tools-server ...`
 - `python codesys_cli.py ...`
 - `run_cli.bat ...`
 
@@ -22,7 +22,7 @@ Current contract:
 
 Built-in help:
 
-- `codesys --help`
+- `codesys-tools --help`
 - `python codesys_cli.py --help`
 - `python codesys_cli.py session --help`
 - `python codesys_cli.py project --help`
@@ -57,10 +57,10 @@ $env:CODESYS_API_TRANSPORT="named_pipe"
 
 Session:
 
-- `codesys session start`
-- `codesys session restart`
-- `codesys session status`
-- `codesys session stop`
+- `codesys-tools session start`
+- `codesys-tools session restart`
+- `codesys-tools session status`
+- `codesys-tools session stop`
 - `python codesys_cli.py session start`
 - `python codesys_cli.py session restart`
 - `python codesys_cli.py session status`
@@ -68,13 +68,13 @@ Session:
 
 Project:
 
-- `codesys project create --path C:\work\demo.project`
-- `codesys project open --path C:\work\demo.project`
-- `codesys project save`
-- `codesys project close`
-- `codesys project list`
-- `codesys project compile`
-- `codesys project compile --clean-build`
+- `codesys-tools project create --path C:\work\demo.project`
+- `codesys-tools project open --path C:\work\demo.project`
+- `codesys-tools project save`
+- `codesys-tools project close`
+- `codesys-tools project list`
+- `codesys-tools project compile`
+- `codesys-tools project compile --clean-build`
 - `python codesys_cli.py project create --path C:\work\demo.project`
 - `python codesys_cli.py project open --path C:\work\demo.project`
 - `python codesys_cli.py project save`
@@ -85,11 +85,11 @@ Project:
 
 POU:
 
-- `codesys pou create --name MotorController --type FunctionBlock --language ST`
-- `codesys pou list`
-- `codesys pou list --parent-path Application`
-- `codesys pou code --path Application\PLC_PRG --implementation-file plc_prg_impl.txt`
-- `codesys pou code --path Application\MotorController --declaration-file decl.txt --implementation-file impl.txt`
+- `codesys-tools pou create --name MotorController --type FunctionBlock --language ST`
+- `codesys-tools pou list`
+- `codesys-tools pou list --parent-path Application`
+- `codesys-tools pou code --path Application\PLC_PRG --implementation-file plc_prg_impl.txt`
+- `codesys-tools pou code --path Application\MotorController --declaration-file decl.txt --implementation-file impl.txt`
 - `python codesys_cli.py pou create --name MotorController --type FunctionBlock --language ST`
 - `python codesys_cli.py pou list`
 - `python codesys_cli.py pou list --parent-path Application`
@@ -99,14 +99,14 @@ POU:
 ## Typical Flow
 
 ```powershell
-codesys session start
-codesys project create --path C:\work\demo.project
-codesys pou create --name MotorController --type FunctionBlock --language ST
-codesys pou list
-codesys project save
-codesys project compile
-codesys project close
-codesys session stop
+codesys-tools session start
+codesys-tools project create --path C:\work\demo.project
+codesys-tools pou create --name MotorController --type FunctionBlock --language ST
+codesys-tools pou list
+codesys-tools project save
+codesys-tools project compile
+codesys-tools project close
+codesys-tools session stop
 ```
 
 Repo-local compatibility:
@@ -127,8 +127,8 @@ python codesys_cli.py session stop
 To confirm compile failure handling, write invalid implementation code into `Application\PLC_PRG` and compile:
 
 ```powershell
-codesys pou code --path Application\PLC_PRG --implementation-file broken_impl.txt
-codesys project compile
+codesys-tools pou code --path Application\PLC_PRG --implementation-file broken_impl.txt
+codesys-tools project compile
 ```
 
 Repo-local compatibility:
@@ -151,7 +151,7 @@ Default output is human-readable.
 Use `--json` for raw structured results:
 
 ```powershell
-codesys --json project compile
+codesys-tools --json project compile
 ```
 
 Repo-local compatibility:

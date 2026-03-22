@@ -17,6 +17,7 @@ GitHub Actions now mirrors this release path:
 - `.github/workflows/ci.yml`
 - `.github/workflows/release-build.yml`
 - `.github/workflows/publish.yml`
+- `.github/workflows/verify-published-package.yml`
 
 ## Version Source
 
@@ -44,8 +45,8 @@ Then verify the wheel in a clean virtual environment:
 python -m venv C:\Users\vboxuser\Desktop\codesys-tools-wheel-smoke
 C:\Users\vboxuser\Desktop\codesys-tools-wheel-smoke\Scripts\python.exe -m pip install --upgrade pip
 C:\Users\vboxuser\Desktop\codesys-tools-wheel-smoke\Scripts\python.exe -m pip install dist\codesys_tools-*.whl
-C:\Users\vboxuser\Desktop\codesys-tools-wheel-smoke\Scripts\codesys.exe --help
-C:\Users\vboxuser\Desktop\codesys-tools-wheel-smoke\Scripts\codesys-server.exe --help
+C:\Users\vboxuser\Desktop\codesys-tools-wheel-smoke\Scripts\codesys-tools.exe --help
+C:\Users\vboxuser\Desktop\codesys-tools-wheel-smoke\Scripts\codesys-tools-server.exe --help
 ```
 
 GitHub-hosted equivalent:
@@ -53,6 +54,7 @@ GitHub-hosted equivalent:
 - CI on `push` / `pull_request` to `master`
 - manual `Release Build` workflow for artifact production
 - manual `Publish Package` workflow for TestPyPI or PyPI
+- manual `Verify Published Package` workflow for clean install verification from TestPyPI or PyPI
 
 Installed package validation must also confirm:
 
@@ -99,5 +101,6 @@ Append release summaries to [RELEASE_NOTES.md](RELEASE_NOTES.md).
 1. Confirm `CI` is green on `master`
 2. Run the manual `Release Build` workflow
 3. Run the manual `Publish Package` workflow with `target=testpypi`
-4. Verify install from TestPyPI in a clean environment
+4. Run the manual `Verify Published Package` workflow with `target=testpypi`
 5. Run the manual `Publish Package` workflow with `target=pypi`
+6. Run the manual `Verify Published Package` workflow with `target=pypi`

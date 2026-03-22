@@ -26,6 +26,7 @@ GitHub Actions release automation now exists:
 - `.github/workflows/ci.yml`
 - `.github/workflows/release-build.yml`
 - `.github/workflows/publish.yml`
+- `.github/workflows/verify-published-package.yml`
 
 ## Required Public Claims
 
@@ -41,8 +42,8 @@ Before calling the package public-release-ready, verify that:
 
 - wheel and sdist build successfully
 - wheel filename matches the current `project.version`
-- installed `codesys --help` succeeds
-- installed `codesys-server --help` succeeds
+- installed `codesys-tools --help` succeeds
+- installed `codesys-tools-server --help` succeeds
 - packaged `PERSISTENT_SESSION.py` resolves
 - packaged `ScriptLib/` resolves
 
@@ -62,6 +63,11 @@ Before the first public upload, configure:
 - matching Trusted Publisher entries on TestPyPI and PyPI
 
 The repository should publish through the manual `Publish Package` workflow, not through long-lived API tokens.
+
+After each publish, verify the installed package through the manual `Verify Published Package` workflow:
+
+- `target=testpypi` after TestPyPI publication
+- `target=pypi` after PyPI publication
 
 ## Outcome
 

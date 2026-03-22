@@ -17,8 +17,9 @@ The repository has already completed the heavy internal transition:
 - internal wheel release flow
 - public release prep
 - GitHub CI/CD release automation
+- published-package verification automation
 
-The transport, lifecycle, compile-hardening, local CLI, packaging phase 1, root cleanup, packaging phase 2, internal wheel release flow, public release prep, and GitHub CI/CD release automation are now all substantially complete. The current priority is no longer internal cleanup; it is to decide whether to run the first public publication or move into a new outward-facing product phase.
+The transport, lifecycle, compile-hardening, local CLI, packaging phase 1, root cleanup, packaging phase 2, internal wheel release flow, public release prep, GitHub CI/CD release automation, and published-package verification automation are now all substantially complete. The current priority is no longer internal cleanup; it is to run the first end-to-end public publication path or move into a new outward-facing product phase.
 
 ## Current Checkpoint
 
@@ -37,6 +38,7 @@ Completed lines:
 - public-facing metadata, README, and installation guidance are in place
 - a public release prep gate is in place
 - GitHub Actions now cover CI, release-build, and manual publish flows
+- GitHub Actions now also cover post-publish install verification flows
 
 Current CLI coverage now includes:
 
@@ -53,7 +55,7 @@ The repository layout has already shifted away from the flat root:
 - long-lived documents are moving into `docs/`
 - debug and diagnostic helpers are moving into `scripts/debug/`
 - root entrypoints remain temporarily for compatibility
-- installation entrypoints now exist via `codesys` and `codesys-server`
+- installation entrypoints now exist via `codesys-tools` and `codesys-tools-server`
 
 ## Target Architecture
 
@@ -105,6 +107,7 @@ The repository layout has already shifted away from the flat root:
 ### Next Decision
 
 - first TestPyPI publication
+- first TestPyPI publication + verification
 - first PyPI publication
 - broader product-facing work
 - future AI/tool integration surfaces

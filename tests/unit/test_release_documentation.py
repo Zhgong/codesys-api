@@ -11,11 +11,12 @@ def test_release_document_references_internal_flow_commands() -> None:
 
     assert "python scripts\\run_baseline.py" in release_doc
     assert "python scripts\\build_release.py" in release_doc
-    assert "codesys" in release_doc
-    assert "codesys-server" in release_doc
+    assert "codesys-tools" in release_doc
+    assert "codesys-tools-server" in release_doc
     assert "dist\\codesys_tools-*.whl" in release_doc
     assert "RELEASE_NOTES.md" in release_doc
     assert ".github/workflows/ci.yml" in release_doc
+    assert ".github/workflows/verify-published-package.yml" in release_doc
     assert "TestPyPI" in release_doc
 
 
@@ -25,5 +26,5 @@ def test_release_notes_tracks_current_internal_release_candidate() -> None:
     assert "## Unreleased" in release_notes
     assert "Current Internal Release Candidate" in release_notes
     assert "Commit: fill this in when cutting the internal release" in release_notes
-    assert "167 passed, 8 skipped" in release_notes
-    assert "`58` source files" in release_notes
+    assert "170 passed, 8 skipped" in release_notes
+    assert "`60` source files" in release_notes

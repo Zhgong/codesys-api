@@ -4,8 +4,8 @@
 
 `codesys-tools` is a Windows-first local package for automating CODESYS through:
 
-- `codesys`
-- `codesys-server`
+- `codesys-tools`
+- `codesys-tools-server`
 
 It assumes a local CODESYS installation is already present.
 
@@ -65,14 +65,14 @@ python -m pip install --upgrade dist\codesys_tools-*.whl
 CLI:
 
 ```powershell
-codesys --help
-codesys --json session status
+codesys-tools --help
+codesys-tools --json session status
 ```
 
 Server:
 
 ```powershell
-codesys-server --help
+codesys-tools-server --help
 ```
 
 Repo-local compatibility entrypoints:
@@ -85,11 +85,11 @@ python HTTP_SERVER.py --help
 ## Minimal Local Smoke
 
 ```powershell
-codesys session start
-codesys project create --path C:\work\demo.project
-codesys project compile
-codesys project close
-codesys session stop
+codesys-tools session start
+codesys-tools project create --path C:\work\demo.project
+codesys-tools project compile
+codesys-tools project close
+codesys-tools session stop
 ```
 
 ## Common Setup Problems

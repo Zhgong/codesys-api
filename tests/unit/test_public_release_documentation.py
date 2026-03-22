@@ -14,8 +14,8 @@ def test_readme_states_public_support_boundary() -> None:
     assert "local CODESYS" in readme
     assert "named_pipe" in readme
     assert "codesys-tools" in readme
-    assert "codesys" in readme
-    assert "codesys-server" in readme
+    assert "codesys-tools" in readme
+    assert "codesys-tools-server" in readme
 
 
 def test_public_release_docs_link_current_public_entrypoints() -> None:
@@ -26,7 +26,8 @@ def test_public_release_docs_link_current_public_entrypoints() -> None:
     assert "Windows-only" in release_doc
     assert "experimental" in release_doc
     assert ".github/workflows/publish.yml" in release_doc
+    assert ".github/workflows/verify-published-package.yml" in release_doc
     assert "Trusted Publishing" in release_doc
-    assert "codesys --help" in install_doc
-    assert "codesys-server --help" in install_doc
+    assert "codesys-tools --help" in install_doc
+    assert "codesys-tools-server --help" in install_doc
     assert "named_pipe" in install_doc

@@ -42,7 +42,8 @@ Latest stable checkpoints:
 - `1fa83b0` defined the internal wheel release flow
 - `771aa04` prepared the package for public release
 - `f117636` renamed the public package to `codesys-tools`
-- GitHub CI/CD automation local work is implemented but not yet committed
+- `045d963` added GitHub Actions CI and release workflows
+- published-package verification automation local work is implemented but not yet committed
 
 ## Verification Status
 
@@ -54,8 +55,8 @@ python scripts\run_baseline.py
 
 Expected results at handoff:
 
-- `pytest`: `167 passed, 8 skipped`
-- `mypy`: success with no issues in `58` source files
+- `pytest`: `170 passed, 8 skipped`
+- `mypy`: success with no issues in `60` source files
 - `git status --short`: should show the GitHub CI/CD working set until this round is committed
 
 Real validation already confirmed:
@@ -79,10 +80,10 @@ Internal release proof now includes:
 - `pip install .` works
 - `python scripts\build_release.py` works
 - `dist/*.whl` and `dist/*.tar.gz` are produced
-- `codesys --help` works
-- `codesys-server --help` works
-- installed `codesys --help` works from a clean venv
-- installed `codesys-server --help` works from a clean venv
+- `codesys-tools --help` works
+- `codesys-tools-server --help` works
+- installed `codesys-tools --help` works from a clean venv
+- installed `codesys-tools-server --help` works from a clean venv
 - installed package assets resolve correctly
 - internal release docs exist:
   - `docs/RELEASE.md`
@@ -96,12 +97,15 @@ Public release prep now adds:
 - public release checklist exists
 - package name is now `codesys-tools`
 - installed entrypoints are now:
-  - `codesys`
-  - `codesys-server`
+  - `codesys-tools`
+  - `codesys-tools-server`
 - GitHub Actions workflows now exist for:
   - CI on `master`
   - manual release builds
   - manual TestPyPI / PyPI publish
+- a manual published-package verification workflow now exists for:
+  - TestPyPI install verification
+  - PyPI install verification
 
 ## Important Constraints
 
@@ -118,9 +122,10 @@ Public release prep now adds:
 1. Keep `HTTP_SERVER.py`, `codesys_cli.py`, `run_cli.bat`, and `PERSISTENT_SESSION.py` compatible.
 2. Keep ordinary imports on `codesys_api.*`; do not reintroduce root module shims.
 3. Run `python scripts\run_baseline.py` before any follow-up release or product work.
-4. The active stage is now GitHub CI/CD:
+4. The active stage is now published-package verification:
    - wire GitHub Environments for Trusted Publishing
    - run the first TestPyPI publish
+   - run `Verify Published Package` against TestPyPI
    - then decide on first real PyPI publication
 
 ## Quick Resume Checklist

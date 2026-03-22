@@ -25,8 +25,8 @@ python scripts\run_baseline.py
 
 Current expected result:
 
-- `pytest`: `167 passed, 8 skipped`
-- `mypy`: success with no issues in `58` source files
+- `pytest`: `170 passed, 8 skipped`
+- `mypy`: success with no issues in `60` source files
 - `py_compile`: success
 
 ## Contract Baseline
@@ -147,8 +147,8 @@ Expected result:
 - `dist/*.whl` exists
 - `dist/*.tar.gz` exists
 - clean wheel install smoke succeeds
-- installed `codesys --help` succeeds
-- installed `codesys-server --help` succeeds
+- installed `codesys-tools --help` succeeds
+- installed `codesys-tools-server --help` succeeds
 - installed package assets resolve correctly
 
 ## Internal Release Gate
