@@ -15,7 +15,7 @@ For public package preparation, see [PUBLIC_RELEASE.md](PUBLIC_RELEASE.md).
 
 ## Prerequisites
 
-- Python 3.14+
+- Python 3.13+
 - Windows environment
 - `build` package installed locally:
 

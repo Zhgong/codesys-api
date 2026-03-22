@@ -8,6 +8,7 @@ Current target posture:
 
 - Windows-only
 - experimental
+- Python 3.13+
 - local CODESYS dependency required
 - published through GitHub Actions using Trusted Publishing
 

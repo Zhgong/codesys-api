@@ -48,6 +48,12 @@ Current CLI coverage now includes:
 
 `/api/v1/system/logs` remains, but it now reads from an in-memory runtime log buffer instead of a file.
 
+Current Python support target:
+
+- public package support: Python 3.13+
+- CI validation: Python 3.13 and 3.14
+- release/publish workflows: Python 3.14
+
 The repository layout has already shifted away from the flat root:
 
 - core host-side implementation is moving into `src/codesys_api/`

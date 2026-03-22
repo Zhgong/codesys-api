@@ -29,6 +29,7 @@ The baseline, repo reorg, packaging phase 1, root cleanup, packaging phase 2, in
 - internal release checklist and release notes are now in place
 - public-facing metadata, README, install guide, and release-prep gate are now in place
 - GitHub Actions CI, release-build, and manual publish workflows are now in place
+- public Python support is now targeting 3.13+
 
 Latest stable checkpoints:
 
@@ -127,6 +128,9 @@ Public release prep now adds:
    - run the first TestPyPI publish
    - run `Verify Published Package` against TestPyPI
    - then decide on first real PyPI publication
+5. Keep public Python support at 3.13+:
+   - CI should validate 3.13 and 3.14
+   - release/publish flows stay pinned to 3.14
 
 ## Quick Resume Checklist
 

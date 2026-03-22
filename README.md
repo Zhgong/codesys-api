@@ -19,6 +19,7 @@ This project is currently published as:
 Current assumptions:
 
 - CODESYS must already be installed on the target machine
+- supported Python versions are 3.13 and 3.14
 - the runtime transport is `named_pipe` only
 - the package does not include a bundled CODESYS runtime
 - public release prep is in place, but the project is not yet committed to cross-platform support
