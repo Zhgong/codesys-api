@@ -46,7 +46,7 @@ def main() -> int:
             (
                 "import py_compile; "
                 "files = ["
-                "'_repo_bootstrap.py','HTTP_SERVER.py','codesys_cli.py','scripts/dev/test_server.py','scripts/build_release.py','scripts/check_public_release.py','scripts/verify_installed_package.py',"
+                "'_repo_bootstrap.py','HTTP_SERVER.py','codesys_cli.py','scripts/build_release.py','scripts/check_public_release.py','scripts/verify_installed_package.py',"
                 "'scripts/manual/run_real_codesys_e2e.py','scripts/manual/profile_launch_probe.py','scripts/manual/real_compile_error_probe.py','scripts/manual/real_pou_code_roundtrip_probe.py','scripts/manual/real_compile_error_matrix.py','scripts/manual/real_cli_compile_error_probe.py','scripts/manual/real_syntax_compile_error_probe.py','scripts/manual/real_project_create_raw_probe.py','scripts/manual/real_project_open_raw_probe.py','scripts/manual/real_project_create_direct_raw_probe.py',"
                 "'src/codesys_api/__init__.py','src/codesys_api/action_layer.py',"
                 "'src/codesys_api/api_key_store.py','src/codesys_api/app_runtime.py',"

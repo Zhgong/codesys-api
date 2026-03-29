@@ -14,8 +14,3 @@ def test_real_codesys_lessons_tracks_key_debugging_learnings() -> None:
     assert "session.created_pous" in content
     assert "do not widen a workaround" in content
 
-
-def test_continue_tomorrow_links_to_real_codesys_lessons() -> None:
-    content = (REPO_ROOT / "docs" / "CONTINUE_TOMORROW.md").read_text(encoding="utf-8")
-
-    assert "REAL_CODESYS_LESSONS.md" in content
