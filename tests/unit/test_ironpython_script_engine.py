@@ -22,26 +22,36 @@ def test_session_start_script_uses_global_scriptengine_system() -> None:
     assert "scriptengine.system" in script
 
 
-def test_project_create_script_contains_template_and_codesys_path() -> None:
+def test_project_create_script_uses_proven_primitives() -> None:
     adapter = make_adapter()
 
     script = adapter.build_execution("project.create", {"path": r"C:\repo\Demo.project"}).script
 
-    assert "scriptengine.projects.open" in script
-    assert "Templates" in script
-    assert r"C:\\Program Files\\CODESYS\\CODESYS\\Common\\CODESYS.exe" in script
-    assert 'desired_device_name = "CODESYS Control Win V3 x64"' in script
-    assert 'desired_device_type = 4096' in script
-    assert 'desired_device_id = "0000 0004"' in script
-    assert 'desired_device_version = "3.5.20.50"' in script
-    assert 'desired_program_name = "PLC_PRG"' in script
-    assert 'desired_task_name = "MainTask"' in script
-    assert "project.add(desired_device_name, desired_device_type, desired_device_id, desired_device_version)" in script
+    # Uses the proven create primitive — not the rejected template-open path
+    assert "scriptengine.projects.create(" in script
+    assert "scriptengine.projects.open(" not in script
+    assert "Templates" not in script
+    assert "save_as(" not in script
+
+    # Device, POU, task lines from proven_primitives
+    assert "project.add(" in script
+    assert "app.create_pou(" in script
     assert "app.create_task_configuration()" in script
-    assert 'task_config.create_task(desired_task_name)' in script
-    assert 'task_pous.add(desired_program_name)' in script
+    assert "task_config.create_task(" in script
+    assert "existing_task.pous.add(" in script
+
+    # Default device values are embedded by proven_primitives builders
+    assert "CODESYS Control Win V3 x64" in script
+    assert "0000 0004" in script
+
+    # Session state and cleanup
     assert 'session.created_pous[desired_program_name] = existing_program' in script
-    assert "device.remove()" in script
+    assert 'session.active_project = project' in script
+    assert 'project_create_stage=' in script
+    assert 'stage = "finalize_session_state"' in script
+    assert 'project.close()' in script
+    assert '"cleanup_attempted": cleanup_attempted' in script
+    assert '"cleanup_succeeded": cleanup_succeeded' in script
 
 
 def test_project_open_script_uses_global_projects_instance() -> None:
@@ -83,7 +93,9 @@ def test_pou_code_script_uses_text_document_replace() -> None:
     assert "textual_declaration.replace(new_text=" in script
     assert "textual_implementation.replace(new_text=" in script
     assert "session.created_pous.get(target_name)" in script
-    assert "for candidate in search_result" in script
+    assert 'normalized_path = raw_path.replace("\\\\", "/")' in script
+    assert "search_terms = [raw_path]" in script
+    assert "if target_name not in search_terms" in script
 
 
 def test_project_compile_script_uses_session_system_for_messages() -> None:
@@ -92,13 +104,26 @@ def test_project_compile_script_uses_session_system_for_messages() -> None:
     script = adapter.build_execution("project.compile", {"clean_build": False}).script
 
     assert "system = session.system" in script
-    assert "application.generate_code()" in script
+    assert "application.generate_code()" not in script
     assert "system.get_messages()" in script
     assert "system.get_message_categories(True)" in script
     assert "system.clear_messages(category)" in script
+    assert "safe_message_harvest = False" in script
+    assert "not safe_message_harvest" in script
     assert 'script_message_category = "{194B48A9-AB51-43ae-B9A9-51D3EDAADDF3}".lower()' in script
     assert "message_counts" in script
     assert 'entry["prefix"] = str(prefix)' in script
+
+
+def test_project_compile_script_can_force_safe_message_harvest() -> None:
+    adapter = make_adapter()
+
+    script = adapter.build_execution(
+        "project.compile",
+        {"clean_build": False, "_safe_message_harvest": True},
+    ).script
+
+    assert "safe_message_harvest = True" in script
 
 
 def test_adapter_reports_engine_name() -> None:
@@ -131,9 +156,9 @@ def test_build_execution_returns_project_compile_script_and_default_timeout() ->
 
     execution = adapter.build_execution("project.compile", {"clean_build": True})
 
-    assert execution.timeout == 120
+    assert execution.timeout == 300
     assert "Starting project compilation script" in execution.script
-    assert '"build_type": "rebuild+generate_code" if clean_build else "build+generate_code"' in execution.script
+    assert '"build_type": "rebuild" if clean_build else "build"' in execution.script
 
 
 def test_build_execution_returns_raw_script_for_script_execute() -> None:

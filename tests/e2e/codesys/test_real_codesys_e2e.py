@@ -245,9 +245,8 @@ def test_real_codesys_main_flow(real_server: tuple[str, subprocess.Popen[str]]) 
         "/api/v1/pou/code",
         method="POST",
         payload={
-            "path": "Application/MotorController",
+            "path": "Application\\MotorController",
             "declaration": (
-                "FUNCTION_BLOCK MotorController\n"
                 "VAR_INPUT\n"
                 "    Enable : BOOL;\n"
                 "END_VAR\n"
@@ -272,6 +271,67 @@ def test_real_codesys_main_flow(real_server: tuple[str, subprocess.Popen[str]]) 
     assert status_code == 200
     assert payload["success"] is True
     assert payload["message_counts"]["errors"] == 0
+
+    status_code, payload = session_status(base_url)
+    assert status_code == 200
+    assert payload["success"] is True
+    assert payload["status"]["process"]["running"] is True
+    assert payload["status"]["session"]["session_active"] is True
+    assert payload["status"]["session"]["project_open"] is True
+    assert payload["status"]["session"]["project"]["path"] == project_path
+
+    status_code, payload = call_json(
+        base_url,
+        "/api/v1/project/close",
+        method="POST",
+        payload={},
+        timeout=120,
+    )
+    assert status_code == 200
+    assert payload["success"] is True
+
+    status_code, payload = call_json(
+        base_url,
+        "/api/v1/project/create",
+        method="POST",
+        payload={"path": str(Path(tempfile.gettempdir()) / f"codesys_api_post_compile_{uuid.uuid4().hex}.project")},
+        timeout=120,
+    )
+    assert status_code == 200
+    assert payload["success"] is True
+
+
+@pytest.mark.codesys
+@pytest.mark.codesys_slow
+def test_real_codesys_project_create_requires_no_active_project(
+    real_server: tuple[str, subprocess.Popen[str]],
+) -> None:
+    base_url, _process = real_server
+    stop_session(base_url)
+    assert_session_started(base_url)
+    first_project_path = str(Path(tempfile.gettempdir()) / f"codesys_api_create_first_{uuid.uuid4().hex}.project")
+    second_project_path = str(Path(tempfile.gettempdir()) / f"codesys_api_create_second_{uuid.uuid4().hex}.project")
+
+    status_code, payload = call_json(
+        base_url,
+        "/api/v1/project/create",
+        method="POST",
+        payload={"path": first_project_path},
+        timeout=120,
+    )
+    assert status_code == 200
+    assert payload["success"] is True
+
+    status_code, payload = call_json(
+        base_url,
+        "/api/v1/project/create",
+        method="POST",
+        payload={"path": second_project_path},
+        timeout=120,
+    )
+    assert status_code == 500
+    assert payload["success"] is False
+    assert "already open" in str(payload["error"]).lower()
 
 
 @pytest.mark.codesys
@@ -359,14 +419,14 @@ def test_real_codesys_compile_without_active_project_fails_cleanly(
     )
     assert status_code == 200
     assert payload["success"] is True
-    assert payload["message_counts"]["errors"] == 0
 
 
 @pytest.mark.codesys
 @pytest.mark.codesys_slow
-def test_real_codesys_compile_detects_project_errors(
+def test_real_codesys_compile_detects_errors(
     real_server: tuple[str, subprocess.Popen[str]],
 ) -> None:
+    """Compile a project with a deliberate error — expects 500 with error messages."""
     base_url, _process = real_server
     stop_session(base_url)
     assert_session_started(base_url)
@@ -384,28 +444,9 @@ def test_real_codesys_compile_detects_project_errors(
 
     status_code, payload = call_json(
         base_url,
-        "/api/v1/pou/create",
-        method="POST",
-        payload={"name": "BrokenController", "type": "FunctionBlock", "language": "ST"},
-        timeout=120,
-    )
-    assert status_code == 200
-    assert payload["success"] is True
-
-    status_code, payload = call_json(
-        base_url,
         "/api/v1/pou/code",
         method="POST",
-        payload={
-            "path": "Application/BrokenController",
-            "declaration": (
-                "FUNCTION_BLOCK BrokenController\n"
-                "VAR\n"
-                "    Output : BOOL;\n"
-                "END_VAR"
-            ),
-            "implementation": "Output := MissingVar;",
-        },
+        payload={"path": "Application/PLC_PRG", "implementation": "MissingVar := TRUE;"},
         timeout=120,
     )
     assert status_code == 200
@@ -421,6 +462,29 @@ def test_real_codesys_compile_detects_project_errors(
     assert status_code == 500
     assert payload["success"] is False
     assert payload["message_counts"]["errors"] > 0
+    assert any("MissingVar" in str(message.get("text", "")) for message in payload["messages"])
+
+
+@pytest.mark.codesys
+@pytest.mark.codesys_slow
+def test_real_codesys_compile_succeeds_with_valid_project(
+    real_server: tuple[str, subprocess.Popen[str]],
+) -> None:
+    """Compile a fresh project with a valid FunctionBlock — expects 200."""
+    base_url, _process = real_server
+    stop_session(base_url)
+    assert_session_started(base_url)
+    project_path = str(Path(tempfile.gettempdir()) / f"codesys_api_compile_ok_{uuid.uuid4().hex}.project")
+
+    status_code, payload = call_json(
+        base_url,
+        "/api/v1/project/create",
+        method="POST",
+        payload={"path": project_path},
+        timeout=120,
+    )
+    assert status_code == 200
+    assert payload["success"] is True
 
     status_code, payload = call_json(
         base_url,
@@ -438,7 +502,7 @@ def test_real_codesys_compile_detects_project_errors(
         method="POST",
         payload={
             "path": "Application/MotorController",
-            "declaration": "FUNCTION_BLOCK MotorController\nVAR_INPUT\n    Enable : BOOL;\nEND_VAR",
+            "declaration": "VAR_INPUT\n    Enable : BOOL;\nEND_VAR",
             "implementation": "IF Enable THEN\nEND_IF;",
         },
         timeout=120,

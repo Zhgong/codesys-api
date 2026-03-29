@@ -351,94 +351,24 @@ class ActionService:
         if not self.engine_adapter.capabilities().project_compile:
             return self._unsupported_action(request.action, request.request_id)
 
-        if self.process_manager.is_running() and self.process_manager.is_no_ui_mode():
-            return self._project_compile_with_ui_fallback(request)
-
+        self.logger.info("Executing compile with full CODESYS message harvest")
         result = self._execute_engine_action(
             action=request.action,
-            params=request.params,
+            params=self._build_compile_params(request.params, safe_message_harvest=False),
             timeout_override=request.timeout,
         )
         status_code = 200 if result.get("success", False) else 500
         return ActionResult(body=result, status_code=status_code, request_id=request.request_id)
 
-    def _project_compile_with_ui_fallback(self, request: ActionRequest) -> ActionResult:
-        session_status = self._execute_engine_action(
-            action=ActionType.SESSION_STATUS,
-            params={},
-            timeout_override=request.timeout,
-        )
-        status_payload = session_status.get("status")
-        project_path = None
-        if isinstance(status_payload, dict):
-            project = status_payload.get("project")
-            if isinstance(project, dict):
-                raw_path = project.get("path")
-                if isinstance(raw_path, str) and raw_path:
-                    project_path = raw_path
-
-        if not project_path:
-            return ActionResult(
-                body={"success": False, "error": "Cannot recover active project path for noUI compile fallback"},
-                status_code=500,
-                request_id=request.request_id,
-            )
-
-        save_result = self._execute_engine_action(
-            action=ActionType.PROJECT_SAVE,
-            params={},
-            timeout_override=request.timeout,
-        )
-        if not save_result.get("success", False):
-            return ActionResult(body=save_result, status_code=500, request_id=request.request_id)
-
-        close_result = self._execute_engine_action(
-            action=ActionType.PROJECT_CLOSE,
-            params={},
-            timeout_override=request.timeout,
-        )
-        if not close_result.get("success", False):
-            return ActionResult(body=close_result, status_code=500, request_id=request.request_id)
-
-        if not self.process_manager.stop():
-            return ActionResult(
-                body={"success": False, "error": "Failed to stop CODESYS session for noUI compile fallback"},
-                status_code=500,
-                request_id=request.request_id,
-            )
-
-        self.process_manager.set_no_ui_mode(False)
-
-        if not self.process_manager.start():
-            return ActionResult(
-                body={"success": False, "error": "Failed to restart CODESYS in UI mode for compile"},
-                status_code=500,
-                request_id=request.request_id,
-            )
-
-        start_result = self._execute_engine_action(
-            action=ActionType.SESSION_START,
-            params={},
-            timeout_override=request.timeout,
-        )
-        if not start_result.get("success", False):
-            return ActionResult(body=start_result, status_code=500, request_id=request.request_id)
-
-        open_result = self._execute_engine_action(
-            action=ActionType.PROJECT_OPEN,
-            params={"path": project_path},
-            timeout_override=request.timeout,
-        )
-        if not open_result.get("success", False):
-            return ActionResult(body=open_result, status_code=500, request_id=request.request_id)
-
-        result = self._execute_engine_action(
-            action=request.action,
-            params=request.params,
-            timeout_override=request.timeout,
-        )
-        status_code = 200 if result.get("success", False) else 500
-        return ActionResult(body=result, status_code=status_code, request_id=request.request_id)
+    def _build_compile_params(
+        self,
+        params: dict[str, object],
+        *,
+        safe_message_harvest: bool,
+    ) -> dict[str, object]:
+        compile_params = dict(params)
+        compile_params["_safe_message_harvest"] = safe_message_harvest
+        return compile_params
 
     def _pou_create(self, request: ActionRequest) -> ActionResult:
         if not self.engine_adapter.capabilities().pou_create:

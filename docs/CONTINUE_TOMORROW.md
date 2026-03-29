@@ -1,145 +1,340 @@
 # Continue Tomorrow
 
-## Current State
+## Executive Summary
 
-The old transport and lifecycle main line is complete:
+This file is the primary breakpoint document for the current real-CODESYS investigation.
 
-- `named_pipe` is the only supported runtime transport
-- host-side and CODESYS-side file transport paths are gone
-- file-based control, status, and logging are gone
-- `/api/v1/system/logs` now reads from an in-memory runtime log buffer
+Method and lessons-learned reference:
 
-CLI is complete enough for normal local use:
+- [REAL_CODESYS_LESSONS.md](/C:/Users/vboxuser/Desktop/Repos/codesys-api/docs/REAL_CODESYS_LESSONS.md)
+- [CODESYS_BOUNDARY_CONTRACT.md](/C:/Users/vboxuser/Desktop/Repos/codesys-api/docs/CODESYS_BOUNDARY_CONTRACT.md)
 
-- CLI v1 and v2 command coverage are implemented
-- local entrypoints and usage docs are in place
-- real CLI positive and negative smoke paths exist
+The active internal engineering milestone is:
 
-The baseline, repo reorg, packaging phase 1, root cleanup, packaging phase 2, internal release flow, and public release prep are complete:
+- `Real CODESYS Contract Ladder v1`
 
-- core host-side implementation now lives under `src/codesys_api/`
-- long-lived documents now live under `docs/`
-- debug and diagnostic helpers now live under `scripts/debug/`
-- runtime stub assets now live under `src/codesys_api/assets/`
-- root entrypoints remain compatible through thin wrapper modules
-- ordinary root module shims are gone
-- most root docs and helper scripts now live under `docs/` and `scripts/`
-- wheel and sdist build flow is now documented and repeatable
-- clean wheel-install smoke has been validated in a fresh venv
-- internal release checklist and release notes are now in place
-- public-facing metadata, README, install guide, and release-prep gate are now in place
-- GitHub Actions CI, release-build, and manual publish workflows are now in place
-- public Python support is now targeting 3.13+
+Current product line:
 
-Latest stable checkpoints:
+- `0.3.0` workflow hardening from external user feedback
 
-- `3a16ec9` completed transport cleanup and established the local CLI
-- `8e0d4d3` replaced file-based session logs with a runtime buffer
-- `75d84b4` established the repository baseline
-- `8e95c68` reorganized the repository into a structured layout
-- `fdf6f47` packaged the reorganized project for `pip install .`
-- `c4a59f2` reduced root layout to formal entrypoints
-- `01f36fa` formalized wheel build and release flow
-- `1fa83b0` defined the internal wheel release flow
-- `771aa04` prepared the package for public release
-- `f117636` renamed the public package to `codesys-tools`
-- `045d963` added GitHub Actions CI and release workflows
-- published-package verification automation local work is implemented but not yet committed
+Do not reframe this as `0.2.x`.
 
-## Verification Status
+## Product Goal Clarification
 
-These commands are green:
+The project goal is defined in terms of utility, not implementation style.
 
-```powershell
-python scripts\run_baseline.py
+What must be true for the product to be considered correct:
+
+- a CODESYS session can stay alive across multiple user-visible steps
+- later operations can keep working on the same in-memory project state
+- step-by-step flows such as `session/start -> project/create -> pou/code -> project/compile` return trustworthy results
+
+What does not define success by itself:
+
+- whether the implementation uses CLI, HTTP, files, named pipes, threads, or extra processes
+- whether a request technically returns JSON if the underlying CODESYS result is incomplete or corrupted
+
+Current debugging and design decisions should therefore be evaluated against this question:
+
+- does the implementation preserve persistent session utility and reliable stepwise operation?
+
+If not, the implementation detail is wrong even if the API surface appears to work.
+
+## Current Product And Branch State
+
+- branch:
+  - `feature/external-feedback-hardening`
+- current product version source:
+  - `pyproject.toml` -> `0.2.1`
+- frozen implementation line:
+  - `0.3.0` workflow hardening from external user feedback
+
+## Verification Status (2026-03-28)
+
+Current local verification baseline:
+
+- full unit sweep:
+  - `266 passed`
+- `python -m mypy`:
+  - `Success: no issues found in 83 source files`
+
+## Completed Work This Session
+
+### Layers 1–4: All GREEN
+
+All prior layers remain green. The thread-root-cause narrative is fully resolved.
+
+### CLI Compile-Error Probe (Layer 4): GREEN
+
+`python scripts\manual\real_cli_compile_error_probe.py` exits 0.
+
+- `cli session/start`: success
+- `cli project/create`: success
+- `cli pou/code`: success
+- `cli project/compile`: exit_code=1, success=false, message_counts.errors=2
+  - messages include `Identifier 'MissingVar' not defined`
+  - messages include `'MissingVar' is no valid assignment target`
+- no popup, no orphan windows
+
+### Lifecycle Stress Probe (2026-03-28): CodesysProcessManager CLEARED
+
+Created `scripts/manual/lifecycle_stress_probe.py` — bypasses HTTP server and pytest entirely,
+drives `CodesysProcessManager` + `NamedPipeScriptTransport` + `ScriptExecutor` directly.
+
+Result: **PASSED all 12 consecutive start → health-check → stop cycles** (UI mode, `--ui`).
+
+```
+python scripts\manual\lifecycle_stress_probe.py --ui --cycles 12
+# PASSED all 12 lifecycle cycles.
+# Interpretation: fault is NOT in process management layer - look at the HTTP server.
 ```
 
-Expected results at handoff:
+This definitively clears `CodesysProcessManager` as the source of the per-lifecycle leak.
+The fault is in the **HTTP server layer** — something in the `HTTPServer` / `BaseHTTPRequestHandler`
+Python process that accumulates state across CODESYS lifecycle transitions.
 
-- `pytest`: `170 passed, 8 skipped`
-- `mypy`: success with no issues in `60` source files
-- `git status --short`: should show the GitHub CI/CD working set until this round is committed
+Side-finding during probe development: `_build_launch_env()` in `codesys_process.py` does NOT
+inject `CODESYS_API_PIPE_NAME` into the subprocess env — it relies on the caller having already
+set `os.environ["CODESYS_API_PIPE_NAME"]` before the process manager is constructed. The HTTP
+server works because the pipe name is in its env at startup. Any standalone probe must set
+`os.environ["CODESYS_API_PIPE_NAME"]` explicitly before creating `ProcessManagerConfig`.
 
-Real validation already confirmed:
+### Changes applied this session
 
-- CLI positive flow works in a clean environment:
-  - `session start`
-  - `project create`
-  - `pou create`
-  - `pou list`
-  - `project save`
-  - `project compile`
-  - `project close`
-  - `session restart`
-  - `project list`
-  - `session stop`
-- CLI negative compile detection works when breaking `Application\PLC_PRG`
+1. `scripts/manual/real_cli_compile_error_probe.py`
+   - Added `is_expected_compile_error_stderr()` — accepts compile-error stderr instead of requiring `== ""`
 
-Internal release proof now includes:
+2. `src/codesys_api/codesys_process.py` — `_stop_attached_session()`
+   - Snapshots pre-shutdown CODESYS pids
+   - Taskkills orphan processes that survive after pipe is gone
 
-- local baseline stays green
-- `pip install .` works
-- `python scripts\build_release.py` works
-- `dist/*.whl` and `dist/*.tar.gz` are produced
-- `codesys-tools --help` works
-- `codesys-tools-server --help` works
-- installed `codesys-tools --help` works from a clean venv
-- installed `codesys-tools-server --help` works from a clean venv
-- installed package assets resolve correctly
-- internal release docs exist:
-  - `docs/RELEASE.md`
-  - `docs/RELEASE_NOTES.md`
+3. `src/codesys_api/ironpython_script_engine.py`
+   - Removed `application.generate_code()` call entirely — unproven primitive, causes
+     post-compile hang in UI mode by queuing background work in CODESYS's UI layer
+   - Changed compile `build_type` label from `"build+generate_code"` to `"build"`
+   - Changed success message from "compiled and generated code" to "compiled successfully"
 
-Public release prep now adds:
+4. `tests/e2e/codesys/test_real_codesys_e2e.py`
+   - Split `test_real_codesys_compile_detects_project_errors` into two focused tests:
+     - `test_real_codesys_compile_detects_errors` — compile with errors → 500
+     - `test_real_codesys_compile_succeeds_with_valid_project` — clean project → 200
 
-- `python scripts\check_public_release.py` succeeds
-- README states Windows experimental support
-- install docs match the current package and entrypoints
-- public release checklist exists
-- package name is now `codesys-tools`
-- installed entrypoints are now:
-  - `codesys-tools`
-  - `codesys-tools-server`
-- GitHub Actions workflows now exist for:
-  - CI on `master`
-  - manual release builds
-  - manual TestPyPI / PyPI publish
-- a manual published-package verification workflow now exists for:
-  - TestPyPI install verification
-  - PyPI install verification
+5. `scripts/manual/run_real_codesys_e2e.py`
+   - Updated `http-compile-error` target `-k` expression for the two new test names
+   - Added: `http-compile-detect`, `http-compile-succeed`, `http-compile-3`,
+     `http-last5`, `http-last6`, `http-last7`, `http-last8`
 
-## Important Constraints
+6. `scripts/manual/lifecycle_stress_probe.py` (NEW)
+   - Standalone probe: `CodesysProcessManager` + `NamedPipeScriptTransport` + `ScriptExecutor`
+   - No HTTP server, no pytest. Loops N cycles of start → health-check → stop.
+   - Usage: `python scripts\manual\lifecycle_stress_probe.py --ui --cycles 12`
 
-- Do not reopen transport design or file-transport work unless a regression appears.
-- Keep REST API v1 behavior stable.
-- Keep `PERSISTENT_SESSION.py` untyped and IronPython-safe.
-- `CODESYS_API_CODESYS_NO_UI` remains opt-in.
-- On this machine, run `pytest` with `--basetemp C:\Users\vboxuser\Desktop\pytest_manual_root`.
-- `project list` uses the current CODESYS recent-projects API and may return an empty list even after a successful create/save/close flow.
-- Close the project before stopping the session after project-based validation flows to avoid IDE-side locks.
+## Current Breakpoint: Per-Lifecycle Resource Leak in HTTP Server
 
-## Next Best Steps
+### Symptom
 
-1. Keep `HTTP_SERVER.py`, `codesys_cli.py`, `run_cli.bat`, and `PERSISTENT_SESSION.py` compatible.
-2. Keep ordinary imports on `codesys_api.*`; do not reintroduce root module shims.
-3. Run `python scripts\run_baseline.py` before any follow-up release or product work.
-4. The active stage is now published-package verification:
-   - wire GitHub Environments for Trusted Publishing
-   - run the first TestPyPI publish
-   - run `Verify Published Package` against TestPyPI
-   - then decide on first real PyPI publication
-5. Keep public Python support at 3.13+:
-   - CI should validate 3.13 and 3.14
-   - release/publish flows stay pinned to 3.14
+`python scripts\manual\run_real_codesys_e2e.py --target http-all` fails:
+
+- 8 tests collected; tests 1–6 pass; test 7 or 8 times out at HTTP socket read (TimeoutError)
+- HTTP server stops responding to requests — server accepts the TCP connection but never
+  sends a response
+- Exact failure: POST `/api/v1/session/stop` (cycle 7) is accepted by the server socket
+  but no response is ever sent. Server is blocked inside `do_POST`.
+
+### Root Cause (confirmed by stress test experiments 2026-03-28)
+
+**Per-CODESYS-lifecycle resource leak** in the HTTP server's Python process.
+
+The fault accumulates once per stop→start cycle, NOT once per pipe operation,
+AND is triggered by something specific to the HTTP server context — NOT by
+`CodesysProcessManager` in isolation.
+
+**Evidence:**
+
+| Experiment | Result | Conclusion |
+|---|---|---|
+| `http-pipe-stress-roundtrips`: 20 pou/code ops, 1 lifecycle | PASS | per-pipe-op leak ruled out |
+| `http-pipe-stress-lifecycles`: 8 stop→start cycles, 3 ops/cycle | FAIL ~cycle 7 | per-lifecycle leak confirmed |
+| `lifecycle_stress_probe.py --ui --cycles 12`: direct process manager, no HTTP | **PASS** | `CodesysProcessManager` cleared |
+
+The `named_pipe_transport.py` client side already has `finally: close_pipe_handle(handle)` on
+every `CreateFileW` call — raw client-side pipe handles ARE properly closed.
+
+`PERSISTENT_SESSION.py` reuses one `NamedPipeServerStream` for the entire CODESYS lifetime
+(no server-side handle accumulation).
+
+### What the probe tells us about the candidates
+
+Because `lifecycle_stress_probe.py` passed 12 cycles, the leak is NOT caused by:
+- `_start_output_threads()` accumulating blocked threads (they join in 0.000s in both contexts)
+- `process.wait()` not being called (probe doesn't call it either and still passes)
+- `CodesysProcessManager.stop()` itself hanging
+
+What's different in the HTTP context vs the probe:
+- Between each stop and the next start, the HTTP test issues **multiple GET `/session/status`
+  requests** via `wait_for_session_state` (polling loop, up to 45s).
+- Each `session/status` call invokes `process_manager.is_running()`, which calls
+  `_is_local_session_running()` → `_is_managed_codesys_running()` → `_refresh_managed_codesys_pids()`.
+- `_refresh_managed_codesys_pids()` calls `list_codesys_process_ids()`, which spawns
+  **PowerShell** via `subprocess.run` with **no timeout**.
+- The probe never calls `is_running()` between stop and start.
+
+### Primary suspect (narrowed)
+
+**`list_codesys_process_ids()` / PowerShell** — called only in the HTTP path (via `is_running()`
+inside `session/status`), never between cycles in the probe. After 7 CODESYS process starts/stops,
+WMI state or process table entries cause `Get-Process -Name CODESYS` to hang indefinitely,
+blocking the single-threaded HTTP server permanently.
+
+Fix: add `timeout=10` to the `subprocess.run` call in `list_codesys_process_ids()`.
+
+### File to fix
+
+`src/codesys_api/codesys_process.py` — `list_codesys_process_ids()` at line ~47:
+
+```python
+# Current (no timeout — hangs if WMI is slow):
+completed = subprocess.run([...], capture_output=True, text=True, check=False)
+
+# Fix:
+completed = subprocess.run([...], capture_output=True, text=True, check=False, timeout=10)
+```
+
+Also add `process.wait(timeout=5)` in `stop()` after the kill sequence, as a belt-and-suspenders
+handle cleanup measure.
+
+### Minimum Reproduction (fast)
+
+```powershell
+python scripts\manual\run_real_codesys_e2e.py --target http-pipe-stress-lifecycles
+```
+
+This runs 8 stop→start cycles with 3 pipe ops/cycle in ~6 minutes.
+The `--target http-pipe-stress-roundtrips` target (20 ops, 1 lifecycle) passes cleanly.
+
+## Active Internal Milestone: Real CODESYS Contract Ladder v1
+
+### Layer 1: Startup Contract - GREEN
+
+### Layer 2: Session And Project Contract - GREEN
+
+- `project/create` works on the correct primitive
+
+### Layer 3: Object Discovery And Write Verification - GREEN
+
+- `real_pou_code_roundtrip_probe.py` passes
+
+### Layer 4: CLI Compile-Error Contract - GREEN
+
+- `real_cli_compile_error_probe.py` exits 0
+- no popup, no orphan windows
+
+### Layer 5: HTTP/CLI Comparison And Aggregate E2E - BLOCKED on lifecycle leak
+
+- Individual HTTP tests and subset runs pass
+- Full `http-all` (8 tests) fails at test 7 or 8 due to per-lifecycle leak
+- `cli-all` not yet run
+- Minimum repro: `http-pipe-stress-lifecycles` (8 cycles, ~6 min)
+
+## Strict Next Steps
+
+Do these in order.
+
+1. Fix `list_codesys_process_ids()` in `src/codesys_api/codesys_process.py` — add `timeout=10`
+   to the `subprocess.run` call. Also add `process.wait(timeout=5)` in `stop()` after the
+   kill/taskkill sequence, before `_join_output_threads()`.
+
+2. Run unit tests and mypy.
+
+3. Run `http-pipe-stress-lifecycles` to confirm fix:
+
+```powershell
+python -m pytest tests/unit/ -p no:cacheprovider -q
+python -m mypy
+python scripts\manual\run_real_codesys_e2e.py --target http-pipe-stress-lifecycles
+```
+
+4. If lifecycle stress passes, run `http-all`:
+
+```powershell
+python scripts\manual\run_real_codesys_e2e.py --target http-all
+```
+
+5. If `http-all` passes, run `cli-all`:
+
+```powershell
+python scripts\manual\run_real_codesys_e2e.py --target cli-all
+```
+
+## Completed Layer Entry Points (reference)
+
+These probes passed and form the regression baseline.
+
+```powershell
+python scripts\manual\profile_launch_probe.py --mode shell_string
+python scripts\manual\real_project_open_raw_probe.py --mode template
+python scripts\manual\real_project_create_direct_raw_probe.py
+python scripts\manual\real_pou_code_roundtrip_probe.py
+python scripts\manual\real_project_compile_probe.py --script-timeout 300
+python scripts\manual\direct_codesys_runscript_probe.py --mode create_and_build_error
+python scripts\manual\direct_codesys_persistent_host_probe.py --exec-mode background --mode single_request_full_build
+python scripts\manual\direct_codesys_persistent_host_probe.py --exec-mode primary --mode single_request_full_build
+python scripts\manual\real_cli_compile_error_probe.py
+python scripts\manual\run_real_codesys_e2e.py --target http-compile-error
+python scripts\manual\run_real_codesys_e2e.py --target http-pipe-stress-roundtrips   <- GREEN
+python scripts\manual\lifecycle_stress_probe.py --ui --cycles 12                     <- GREEN (process manager cleared)
+python scripts\manual\run_real_codesys_e2e.py --target http-pipe-stress-lifecycles   <- CURRENTLY FAILING
+python scripts\manual\run_real_codesys_e2e.py --target http-all                      <- CURRENTLY FAILING
+python scripts\manual\run_real_codesys_e2e.py --target cli-all                       <- NOT YET RUN
+```
+
+## What Not To Do
+
+- do not reopen transport redesign as the primary problem
+- do not treat sandbox-launch failures as product regressions
+- do not treat empty stderr as the definition of correct compile-error behavior
+- do not reopen the old noUI fallback narrative as the current blocker
+- do not add to `proven_primitives.py` without a passing real probe
+- do not reopen `Standard.project` template approach
+- do not treat `named_pipe_transport.py` as the source of the leak — client handles ARE
+  properly closed (`finally: close_pipe_handle(handle)` confirmed present)
+- do not remove `generate_code()` as the sole fix for http-all — it was already removed and
+  http-all still fails
+- do not blame `CodesysProcessManager` in isolation — `lifecycle_stress_probe.py --ui --cycles 12`
+  PASSED, proving the process manager can handle 12+ cycles cleanly without the HTTP layer
+
+## Working Set
+
+- `src/codesys_api/codesys_process.py` — **fix here: `list_codesys_process_ids()` needs `timeout=10`**
+- `tests/e2e/codesys/test_pipe_stress.py` — minimum repro test
+- `scripts/manual/lifecycle_stress_probe.py` — process-manager isolation probe (passes 12 cycles)
+- `src/codesys_api/assets/PERSISTENT_SESSION.py` (current proven primary-thread runtime)
+- `scripts/manual/run_real_codesys_e2e.py` (diagnostic targets already added)
 
 ## Quick Resume Checklist
 
-1. Open `docs\STRATEGIC_PLAN.md`
-2. Open `docs\BASELINE.md`
-3. Open this file
+1. Open:
+
+- `docs\CONTINUE_TOMORROW.md`
+- `docs\CODESYS_BOUNDARY_CONTRACT.md`
+
+2. Refresh local baseline:
+
+```powershell
+git status --short --branch
+python -m pytest tests/unit/ -p no:cacheprovider -q
+python -m mypy
+```
+
+Expected: 266 passed, mypy clean.
+
+3. Read `src/codesys_api/codesys_process.py` and fix the lifecycle leak.
+
 4. Run:
 
 ```powershell
-python scripts\run_baseline.py
-git status --short
+python -m pytest tests/unit/ -p no:cacheprovider -q
+python -m mypy
+python scripts\manual\run_real_codesys_e2e.py --target http-pipe-stress-lifecycles
+python scripts\manual\run_real_codesys_e2e.py --target http-all
 ```

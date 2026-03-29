@@ -25,8 +25,8 @@ python scripts\run_baseline.py
 
 Current expected result:
 
-- `pytest`: `170 passed, 8 skipped`
-- `mypy`: success with no issues in `60` source files
+- `pytest`: `195 passed, 9 skipped`
+- `mypy`: success with no issues in `64` source files
 - `py_compile`: success
 
 ## Contract Baseline
@@ -67,6 +67,7 @@ The real baseline keeps the current working CODESYS path stable.
 HTTP real baseline:
 
 - positive main flow
+- active project must be closed before creating another project
 - restart/start/stop repeatability
 - compile without active project fails cleanly
 - compile detects project errors
@@ -116,7 +117,21 @@ Python compatibility policy:
 - GitHub CI validates 3.13 and 3.14
 - release and publish workflows remain pinned to Python 3.14
 
-Real CODESYS baseline remains opt-in and requires the existing environment variables:
+Real CODESYS baseline remains opt-in and does not run in GitHub Actions. CI collects those tests, but the real-CODESYS cases are skipped there because the workflows do not provide a CODESYS installation or the required opt-in environment.
+
+Local real CODESYS validation should now be started from a normal Windows user terminal through the dedicated runner:
+
+```powershell
+python scripts\manual\run_real_codesys_e2e.py
+```
+
+The local runner reads `.env.real-codesys.local` and refuses to run under the Codex sandbox identity so that sandbox-only startup failures are not mistaken for product regressions.
+
+The local runner now defaults real E2E to UI mode (`CODESYS_E2E_NO_UI=0`). This temporarily avoids the current noUI compile fallback restore problem, where CODESYS can keep the project locked while switching back from UI mode to noUI mode after compile.
+
+If you explicitly want to investigate the noUI path, set `CODESYS_E2E_NO_UI=1` yourself before launching the runner and treat that as a focused compatibility check, not the current real-baseline default.
+
+The local env file must still provide:
 
 - `CODESYS_E2E_ENABLE=1`
 - `CODESYS_API_CODESYS_PATH`
@@ -126,8 +141,16 @@ Real CODESYS baseline remains opt-in and requires the existing environment varia
 Suggested real baseline commands:
 
 ```powershell
-python -m pytest -q tests\e2e\codesys\test_real_codesys_e2e.py --basetemp C:\Users\vboxuser\Desktop\pytest_manual_root -m "codesys"
-python -m pytest -q tests\e2e\codesys\test_real_codesys_cli.py --basetemp C:\Users\vboxuser\Desktop\pytest_manual_root -m "codesys"
+python scripts\manual\run_real_codesys_e2e.py --target http-main
+python scripts\manual\run_real_codesys_e2e.py --target http-all
+python scripts\manual\run_real_codesys_e2e.py --target cli-main
+python scripts\manual\run_real_codesys_e2e.py --target cli-all
+```
+
+When profile auto-selection regresses, compare Python launch shapes first:
+
+```powershell
+python scripts\manual\profile_launch_probe.py --mode all
 ```
 
 ## Usage

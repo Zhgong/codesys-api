@@ -3,6 +3,7 @@
 ## Summary
 
 The repository now provides a local CLI entrypoint on top of the shared action layer.
+The CLI is a convenience wrapper; the HTTP server is the primary workflow for persistent multi-step session usage.
 
 Supported entrypoints:
 
@@ -12,6 +13,12 @@ Supported entrypoints:
 - `run_cli.bat ...`
 
 The CLI talks directly to the local runtime wiring. It does not call the HTTP API.
+
+Important:
+
+- each CLI invocation executes one action
+- reuse the same `CODESYS_API_PIPE_NAME` when you want later CLI commands to attach to the same CODESYS session
+- use `codesys-tools-server` when you want the primary persistent-session workflow
 
 Current contract:
 
@@ -41,7 +48,7 @@ Required on this machine:
 Important runtime assumptions:
 
 - only `named_pipe` is supported
-- `CODESYS_API_CODESYS_NO_UI` is opt-in
+- `CODESYS_API_CODESYS_NO_UI=1` is recommended for headless server workflows
 - project creation uses the validated default SoftPLC automatically
 
 Example:
@@ -83,12 +90,18 @@ Project:
 - `python codesys_cli.py project compile`
 - `python codesys_cli.py project compile --clean-build`
 
+Current project contract:
+
+- `project create` creates and opens a project as the active project
+- if another project is already active, `project create` fails instead of replacing it
+- close the current project first when you want to create another one
+
 POU:
 
 - `codesys-tools pou create --name MotorController --type FunctionBlock --language ST`
 - `codesys-tools pou list`
 - `codesys-tools pou list --parent-path Application`
-- `codesys-tools pou code --path Application\PLC_PRG --implementation-file plc_prg_impl.txt`
+- `codesys-tools pou code --path CounterFB --implementation-file plc_prg_impl.txt`
 - `codesys-tools pou code --path Application\MotorController --declaration-file decl.txt --implementation-file impl.txt`
 - `python codesys_cli.py pou create --name MotorController --type FunctionBlock --language ST`
 - `python codesys_cli.py pou list`
@@ -99,15 +112,10 @@ POU:
 ## Typical Flow
 
 ```powershell
-codesys-tools session start
-codesys-tools project create --path C:\work\demo.project
-codesys-tools pou create --name MotorController --type FunctionBlock --language ST
-codesys-tools pou list
-codesys-tools project save
-codesys-tools project compile
-codesys-tools project close
-codesys-tools session stop
+codesys-tools-server
 ```
+
+For multi-step workflows, either reuse the same `CODESYS_API_PIPE_NAME` across CLI invocations or use the HTTP server.
 
 Repo-local compatibility:
 
@@ -184,4 +192,7 @@ These failures return exit code `2`.
 ## Notes
 
 - `project list` uses the current CODESYS recent-projects API and may legitimately return an empty list.
+- `pou/code --path` accepts bare names and tree paths with `/` or `\`.
+- `project/compile` may restart CODESYS in UI mode temporarily when `CODESYS_API_CODESYS_NO_UI=1`.
+- POU declarations sent via `pou/code` must omit the `FUNCTION_BLOCK` / `PROGRAM` header line.
 - After project-based validation flows, close the project before stopping the session to avoid IDE-side project locks.

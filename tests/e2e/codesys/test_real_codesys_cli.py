@@ -122,7 +122,7 @@ def test_real_codesys_cli_main_flow() -> None:
         assert stderr == ""
         assert payload["success"] is True
         assert payload["message_counts"]["errors"] == 0
-        assert payload["build_type"] == "build+generate_code"
+        assert payload["build_type"] == "build"
 
         exit_code, payload, stderr = run_cli_json(env, "project", "close")
         assert exit_code == 0

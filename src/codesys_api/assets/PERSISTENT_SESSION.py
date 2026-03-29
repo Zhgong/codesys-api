@@ -20,7 +20,6 @@ import sys
 import time
 import json
 import traceback
-import threading
 import warnings
 
 NAMED_PIPE_SUPPORT = False
@@ -61,7 +60,6 @@ class CodesysPersistentSession(object):
         self.system = None
         self.active_project = None
         self.running = True
-        self.request_thread = None
         self.init_success = False
         
     def initialize(self):
@@ -169,23 +167,10 @@ class CodesysPersistentSession(object):
         if not self.init_success:
             self.log("Cannot run - initialization failed")
             return False
-            
-        # Start request processing thread
-        self.request_thread = threading.Thread(target=self.process_named_pipe_requests)
-        self.request_thread.daemon = True
-        self.request_thread.start()
-        
-        # Main loop
+
         try:
-            self.log("Entering main loop")
-            
-            while self.running:
-                # Perform periodic tasks
-                self.periodic_tasks()
-                
-                # Sleep to prevent CPU hogging
-                time.sleep(0.1)
-                
+            self.log("Entering named pipe request loop on primary thread")
+            self.process_named_pipe_requests()
             self.log("Exiting main loop")
             return True
         except Exception, e:

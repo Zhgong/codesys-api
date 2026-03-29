@@ -4,11 +4,14 @@ import argparse
 from collections.abc import Sequence
 
 from .http_server import run_server
+from .help_text import SERVER_HELP_DESCRIPTION, build_server_help_epilog
 
 
 def build_parser() -> argparse.ArgumentParser:
     return argparse.ArgumentParser(
-        description="Run the local codesys-tools HTTP server.",
+        description=SERVER_HELP_DESCRIPTION,
+        epilog=build_server_help_epilog(),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 
 

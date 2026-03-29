@@ -36,10 +36,7 @@ Required runtime environment variables:
 - `CODESYS_API_CODESYS_PATH`
 - `CODESYS_API_CODESYS_PROFILE`
 - `CODESYS_API_CODESYS_PROFILE_PATH`
-
-Optional:
-
-- `CODESYS_API_CODESYS_NO_UI=1`
+- `CODESYS_API_CODESYS_NO_UI=1` for headless project workflows
 
 ## Install From Source
 
@@ -69,6 +66,8 @@ codesys-tools --help
 codesys-tools --json session status
 ```
 
+For multi-step workflows, prefer `codesys-tools-server`; repeated CLI calls are a convenience path and reuse the same `CODESYS_API_PIPE_NAME` only when needed.
+
 Server:
 
 ```powershell
@@ -85,12 +84,28 @@ python HTTP_SERVER.py --help
 ## Minimal Local Smoke
 
 ```powershell
-codesys-tools session start
-codesys-tools project create --path C:\work\demo.project
-codesys-tools project compile
-codesys-tools project close
-codesys-tools session stop
+codesys-tools-server
 ```
+
+Then use authenticated HTTP requests:
+
+- `Authorization: ApiKey admin`
+
+Typical workflow:
+
+```powershell
+Invoke-RestMethod -Method POST -Uri http://127.0.0.1:8080/api/v1/session/start -Headers @{ Authorization = "ApiKey admin" }
+Invoke-RestMethod -Method POST -Uri http://127.0.0.1:8080/api/v1/project/create -Headers @{ Authorization = "ApiKey admin" } -ContentType "application/json" -Body '{"path":"C:\\work\\demo.project"}'
+Invoke-RestMethod -Method POST -Uri http://127.0.0.1:8080/api/v1/pou/create -Headers @{ Authorization = "ApiKey admin" } -ContentType "application/json" -Body '{"name":"CounterFB","type":"FunctionBlock","language":"ST"}'
+Invoke-RestMethod -Method POST -Uri http://127.0.0.1:8080/api/v1/pou/code -Headers @{ Authorization = "ApiKey admin" } -ContentType "application/json" -Body '{"path":"Application\\CounterFB","declaration":"VAR_INPUT`n    Enable : BOOL;`nEND_VAR","implementation":"Output := Enable;"}'
+Invoke-RestMethod -Method POST -Uri http://127.0.0.1:8080/api/v1/project/save -Headers @{ Authorization = "ApiKey admin" }
+Invoke-RestMethod -Method POST -Uri http://127.0.0.1:8080/api/v1/project/close -Headers @{ Authorization = "ApiKey admin" }
+```
+
+Compile caveats:
+
+- `project/compile` runs against the active persistent session and returns CODESYS message-store results
+- POU declarations sent through `pou/code` must omit the `FUNCTION_BLOCK` / `PROGRAM` header line
 
 ## Common Setup Problems
 

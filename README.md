@@ -8,6 +8,19 @@ Windows-first, experimental local automation tooling for CODESYS.
 - a local HTTP server: `codesys-tools-server`
 - a persistent CODESYS runtime built around `named_pipe`
 
+## Product Goal
+
+This project is optimized for user-facing utility, not for any single transport or hosting mechanism.
+
+The goal is to give users a reliable way to work with one persistent CODESYS session across multiple steps, so they can:
+
+- keep a CODESYS session alive across separate commands
+- operate on the same project incrementally instead of rebuilding state every time
+- get trustworthy results from each step, especially for compile/build flows
+
+From the product perspective, `CLI`, `HTTP`, `named_pipe`, background services, threads, and process boundaries are implementation details.
+They are only acceptable if they preserve the core utility above without introducing false success, false failure, duplicate IDE instances, or UI-thread crashes.
+
 ## Support Boundary
 
 This project is currently published as:
@@ -46,21 +59,11 @@ At minimum, local CODESYS usage requires:
 - `CODESYS_API_CODESYS_PATH`
 - `CODESYS_API_CODESYS_PROFILE`
 - `CODESYS_API_CODESYS_PROFILE_PATH`
+- `CODESYS_API_CODESYS_NO_UI=1` for headless project workflows to avoid the WinForms crash on `project/create`
 
 The CLI and server both use the same runtime wiring and packaged assets.
 
 ## Quick Start
-
-CLI:
-
-```powershell
-codesys-tools --help
-codesys-tools session start
-codesys-tools project create --path C:\work\demo.project
-codesys-tools project compile
-codesys-tools project close
-codesys-tools session stop
-```
 
 Server:
 
@@ -68,6 +71,52 @@ Server:
 codesys-tools-server --help
 python HTTP_SERVER.py
 ```
+
+HTTP is the primary product surface for persistent multi-step workflows.
+
+CLI:
+
+```powershell
+codesys-tools --help
+```
+
+CLI notes:
+
+- each `codesys-tools` invocation executes one action
+- reuse the same `CODESYS_API_PIPE_NAME` when you want later CLI commands to attach to the same CODESYS session
+- use `codesys-tools-server` when you want the primary persistent-session workflow
+
+## HTTP Workflow Example
+
+Start the server with the required environment:
+
+```powershell
+$env:CODESYS_API_CODESYS_PATH="C:\Program Files\CODESYS 3.5.20.60\CODESYS\Common\CODESYS.exe"
+$env:CODESYS_API_CODESYS_PROFILE="CODESYS V3.5 SP20 Patch 6"
+$env:CODESYS_API_CODESYS_PROFILE_PATH="C:\Program Files\CODESYS 3.5.20.60\CODESYS\Profiles\CODESYS V3.5 SP20 Patch 6.profile.xml"
+$env:CODESYS_API_CODESYS_NO_UI="1"
+codesys-tools-server
+```
+
+Then send authenticated requests with:
+
+- `Authorization: ApiKey admin`
+
+Example workflow:
+
+```powershell
+Invoke-RestMethod -Method POST -Uri http://127.0.0.1:8080/api/v1/session/start -Headers @{ Authorization = "ApiKey admin" }
+Invoke-RestMethod -Method POST -Uri http://127.0.0.1:8080/api/v1/project/create -Headers @{ Authorization = "ApiKey admin" } -ContentType "application/json" -Body '{"path":"C:\\work\\demo.project"}'
+Invoke-RestMethod -Method POST -Uri http://127.0.0.1:8080/api/v1/pou/create -Headers @{ Authorization = "ApiKey admin" } -ContentType "application/json" -Body '{"name":"CounterFB","type":"FunctionBlock","language":"ST"}'
+Invoke-RestMethod -Method POST -Uri http://127.0.0.1:8080/api/v1/pou/code -Headers @{ Authorization = "ApiKey admin" } -ContentType "application/json" -Body '{"path":"Application\\CounterFB","declaration":"VAR_INPUT`n    Enable : BOOL;`nEND_VAR","implementation":"Output := Enable;"}'
+Invoke-RestMethod -Method POST -Uri http://127.0.0.1:8080/api/v1/project/save -Headers @{ Authorization = "ApiKey admin" }
+Invoke-RestMethod -Method POST -Uri http://127.0.0.1:8080/api/v1/project/close -Headers @{ Authorization = "ApiKey admin" }
+```
+
+Compile note:
+
+- `project/compile` runs against the active persistent session and returns CODESYS message-store results
+- POU declarations sent via `pou/code` must omit the `FUNCTION_BLOCK` / `PROGRAM` header line; start at the `VAR` sections
 
 Repo-local compatibility entrypoints remain available:
 

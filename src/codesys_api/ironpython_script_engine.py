@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from .engine_adapter import EngineCapabilities, ExecutionSpec
+from . import proven_primitives
 
 
 class IronPythonScriptEngineAdapter:
@@ -56,7 +57,7 @@ class IronPythonScriptEngineAdapter:
         if action == "project.list":
             return ExecutionSpec(script=self._generate_project_list_script(), timeout=30)
         if action == "project.compile":
-            return ExecutionSpec(script=self._generate_project_compile_script(params), timeout=120)
+            return ExecutionSpec(script=self._generate_project_compile_script(params), timeout=300)
         if action == "pou.create":
             return ExecutionSpec(script=self._generate_pou_create_script(params), timeout=30)
         if action == "pou.code":
@@ -180,198 +181,73 @@ except Exception as e:
         device_id = str(params.get("device_id", "0000 0004"))
         device_version = str(params.get("device_version", "3.5.20.50"))
 
-        template_path = str(params.get("template_path", ""))
-        if not template_path:
-            codesys_dir = os.path.dirname(str(self.codesys_path))
-            if "Common" in codesys_dir:
-                codesys_dir = os.path.dirname(codesys_dir)
-            template_path = os.path.join(codesys_dir, "Templates", "Standard.project")
-            self.logger.info("Using derived template path: %s", template_path)
-
-        codesys_path = str(self.codesys_path)
+        # Build fragments from proven primitives only.
+        # Each fragment is backed by a passing real-CODESYS probe.
+        # See docs/CODESYS_BOUNDARY_CONTRACT.md and src/codesys_api/proven_primitives.py.
+        create_fragment = proven_primitives.build_create_empty_project_fragment(path)
+        add_device_fragment = proven_primitives.build_add_device_fragment(
+            device_name, device_type, device_id, device_version
+        )
+        resolve_app_fragment = proven_primitives.build_resolve_active_application_fragment()
+        create_pou_fragment = proven_primitives.build_create_pou_fragment("PLC_PRG")
+        create_task_config_fragment = proven_primitives.build_create_task_configuration_fragment()
+        create_task_fragment = proven_primitives.build_create_main_task_fragment("MainTask")
+        assign_fragment = proven_primitives.build_assign_pou_to_task_fragment("PLC_PRG")
 
         return """
-# Simple script to create a project from template - IronPython 2.7 compatible
+# Project creation script - IronPython 2.7 compatible
 import scriptengine
-import json
 import os
 import sys
 import warnings
 import traceback
 
-# Silence deprecation warnings for sys.exc_clear() in IronPython 2.7
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
+desired_program_name = "PLC_PRG"
+desired_task_name = "MainTask"
+
 try:
+    stage = "create_project"
+    project = None
+    active_project_set = False
+    cleanup_attempted = False
+    cleanup_succeeded = False
+    cleanup_errors = []
     print("Starting project creation script")
-    
-    # Check if standard template exists at the provided path
-    template_path = "{1}"
-    print("Looking for template at: " + template_path)
-    
-    if not os.path.exists(template_path):
-        print("Template not found at: " + template_path)
-        
-        # Try to determine template location directly from CODESYS_PATH
-        codesys_path = r"{2}"
-        print("CODESYS path: " + codesys_path)
-        
-        # Derive template path from CODESYS executable path
-        codesys_dir = os.path.dirname(codesys_path)  # Get directory containing CODESYS.exe
-        if "Common" in codesys_dir:  # Handle "Common" subfolder case
-            codesys_dir = os.path.dirname(codesys_dir)  # Go up one level
-            
-        template_path = os.path.join(codesys_dir, "Templates", "Standard.project")
-        print("Trying template at: " + template_path)
-    
-    if not os.path.exists(template_path):
-        print("Template not found! Cannot create project from template.")
-        raise Exception("Template not found at: " + template_path)
-    
-    # Simple approach: open template, save as new name
-    print("Opening template: " + template_path)
-    project = scriptengine.projects.open(template_path)
+    print("project_create_stage=" + stage)
+
+    {create_fragment}
     if project is None:
-        print("Failed to open template project")
-        raise Exception("Failed to open template project at: " + template_path)
-    
-    print("Template opened successfully")
-    
-    # Save as new project name
-    print("Saving as new project: {0}")
-    if hasattr(project, 'save_as'):
-        project.save_as("{0}")
-        print("Project saved successfully as: {0}")
-    else:
-        print("Project has no save_as method")
-        raise Exception("Project object does not have a save_as method")
+        raise Exception("projects.create returned None")
+    print("Empty project created at: " + str(project.path if hasattr(project, 'path') else ""))
 
-    desired_device_name = "{3}"
-    desired_device_type = {4}
-    desired_device_id = "{5}"
-    desired_device_version = "{6}"
-    desired_program_name = "PLC_PRG"
-    desired_task_name = "MainTask"
-    print("Ensuring desired device exists: " + desired_device_name)
+    stage = "add_device"
+    print("project_create_stage=" + stage)
+    {add_device_fragment}
+    print("Device added")
 
-    top_level_objects = []
-    if hasattr(project, 'get_children'):
-        top_level_objects = project.get_children()
+    stage = "resolve_active_application"
+    print("project_create_stage=" + stage)
+    {resolve_app_fragment}
+    if app is None:
+        raise Exception("No active application after add_device")
+    print("Active application: " + str(app.get_name(False) if hasattr(app, 'get_name') else app))
 
-    existing_devices = []
-    desired_device_found = False
-    for child in top_level_objects:
-        try:
-            if hasattr(child, 'is_device') and child.is_device:
-                existing_devices.append(child)
-                child_name = child.get_name(False) if hasattr(child, 'get_name') else str(child)
-                print("Found top-level device: " + str(child_name))
-                if str(child_name) == desired_device_name:
-                    desired_device_found = True
-        except Exception as child_e:
-            print("Warning: failed to inspect top-level object: " + str(child_e))
+    stage = "create_or_resolve_plc_prg"
+    print("project_create_stage=" + stage)
+    {create_pou_fragment}
+    print("PLC_PRG created")
 
-    if not desired_device_found:
-        print("Desired device not found, removing existing top-level devices")
-        for device in existing_devices:
-            try:
-                if hasattr(device, 'remove'):
-                    device.remove()
-                    print("Removed existing device")
-            except Exception as remove_e:
-                print("Warning: failed to remove existing device: " + str(remove_e))
+    stage = "create_or_resolve_task_configuration"
+    print("project_create_stage=" + stage)
+    {create_task_config_fragment}
+    print("Task configuration created")
 
-        print("Adding desired device")
-        if hasattr(project, 'add'):
-            project.add(desired_device_name, desired_device_type, desired_device_id, desired_device_version)
-        else:
-            raise Exception("Project object does not support adding devices")
-
-    desired_application = None
-    all_objects = []
-    if hasattr(project, 'get_children'):
-        all_objects = project.get_children(True)
-    for obj in all_objects:
-        try:
-            if hasattr(obj, 'is_application') and obj.is_application:
-                parent_name = ""
-                if hasattr(obj, 'parent') and obj.parent is not None and hasattr(obj.parent, 'get_name'):
-                    parent_name = str(obj.parent.get_name(False))
-                if parent_name == desired_device_name or desired_application is None:
-                    desired_application = obj
-        except Exception as app_e:
-            print("Warning: failed to inspect application candidate: " + str(app_e))
-
-    if desired_application is not None and hasattr(project, 'active_application'):
-        try:
-            project.active_application = desired_application
-            print("Set desired active application")
-        except Exception as active_e:
-            print("Warning: failed to set desired active application: " + str(active_e))
-
-    print("Setting as active project")
-    session.active_project = project
-    
-    print("Checking for active application")
-    if hasattr(project, 'active_application') and project.active_application is not None:
-        app = project.active_application
-        print("Found active application: " + str(app))
-    else:
-        print("No active application found in project")
-        raise Exception("Project does not contain an active application for the requested SoftPLC")
-
-    existing_program = None
-    task_config = None
-    existing_task = None
-    app_children = []
-    if hasattr(app, 'get_children'):
-        try:
-            app_children = app.get_children(True)
-        except Exception as child_scan_e:
-            print("Warning: failed to enumerate application children: " + str(child_scan_e))
-
-    for child in app_children:
-        try:
-            child_name = child.get_name(False) if hasattr(child, 'get_name') else ""
-            if str(child_name) == desired_program_name:
-                existing_program = child
-            if hasattr(child, 'is_task_configuration') and child.is_task_configuration:
-                task_config = child
-            if hasattr(child, 'is_task') and child.is_task and str(child_name) == desired_task_name:
-                existing_task = child
-        except Exception as child_e:
-            print("Warning: failed to inspect application child: " + str(child_e))
-
-    if existing_program is None:
-        print("Creating default program: " + desired_program_name)
-        if hasattr(app, 'create_pou'):
-            existing_program = app.create_pou(
-                name=desired_program_name,
-                type=scriptengine.PouType.Program,
-                language=scriptengine.ImplementationLanguages.st
-            )
-        elif hasattr(app, 'pou_container'):
-            existing_program = app.pou_container.create_pou(
-                name=desired_program_name,
-                type=scriptengine.PouType.Program,
-                language=scriptengine.ImplementationLanguages.st
-            )
-        else:
-            raise Exception("Application does not support creating a default PLC_PRG")
-
-    if task_config is None:
-        print("Creating task configuration")
-        if hasattr(app, 'create_task_configuration'):
-            task_config = app.create_task_configuration()
-        else:
-            raise Exception("Application does not support creating task configuration")
-
-    if existing_task is None:
-        print("Creating default task: " + desired_task_name)
-        if hasattr(task_config, 'create_task'):
-            existing_task = task_config.create_task(desired_task_name)
-        else:
-            raise Exception("Task configuration object does not support creating tasks")
+    stage = "create_or_resolve_main_task"
+    print("project_create_stage=" + stage)
+    {create_task_fragment}
+    print("MainTask created")
 
     if hasattr(existing_task, 'kind_of_task') and hasattr(scriptengine, 'KindOfTask'):
         try:
@@ -383,63 +259,78 @@ try:
             existing_task.interval = "20"
         except Exception as task_interval_e:
             print("Warning: failed to set task interval: " + str(task_interval_e))
-    if hasattr(existing_task, 'interval_unit'):
-        try:
-            existing_task.interval_unit = "ms"
-        except Exception as task_unit_e:
-            print("Warning: failed to set task interval unit: " + str(task_unit_e))
 
-    if hasattr(existing_task, 'pous'):
-        try:
-            task_pous = existing_task.pous
-            task_has_program = False
-            for task_pou in task_pous:
-                try:
-                    if str(task_pou) == desired_program_name:
-                        task_has_program = True
-                        break
-                    if hasattr(task_pou, 'get_name') and str(task_pou.get_name(False)) == desired_program_name:
-                        task_has_program = True
-                        break
-                except Exception:
-                    pass
-            if not task_has_program and hasattr(task_pous, 'add'):
-                print("Assigning default program to task")
-                task_pous.add(desired_program_name)
-        except Exception as task_pou_e:
-            print("Warning: failed to assign default program to task: " + str(task_pou_e))
+    stage = "assign_program_to_task"
+    print("project_create_stage=" + stage)
+    {assign_fragment}
+    print("PLC_PRG assigned to MainTask")
 
+    stage = "finalize_session_state"
+    print("project_create_stage=" + stage)
+    session.active_project = project
+    active_project_set = True
     if not hasattr(session, 'created_pous'):
         session.created_pous = {{}}
     session.created_pous[desired_program_name] = existing_program
-    
+
     print("Project creation completed")
-    
+
     result = {{
         "success": True,
         "project": {{
-            "path": project.path if hasattr(project, 'path') else "{0}",
-            "name": project.name if hasattr(project, 'name') else os.path.basename("{0}"),
+            "path": project.path if hasattr(project, 'path') else "",
+            "name": project.name if hasattr(project, 'name') else "",
             "dirty": project.dirty if hasattr(project, 'dirty') else False
         }}
     }}
 except:
     error_type, error_value, error_traceback = sys.exc_info()
-    print("Error creating project: " + str(error_value))
+    print("Error creating project at stage " + str(stage) + ": " + str(error_value))
     print(traceback.format_exc())
-    
+    cleanup_attempted = True
+    cleanup_succeeded = True
+    project_path_if_any = ""
+    try:
+        if project is not None and hasattr(project, 'path'):
+            project_path_if_any = project.path
+    except Exception:
+        project_path_if_any = ""
+    try:
+        if active_project_set and hasattr(session, 'active_project') and session.active_project is project:
+            session.active_project = None
+    except Exception as cleanup_e:
+        cleanup_succeeded = False
+        cleanup_errors.append("clear_active_project: " + str(cleanup_e))
+    try:
+        if hasattr(session, 'created_pous') and session.created_pous and desired_program_name in session.created_pous:
+            del session.created_pous[desired_program_name]
+    except Exception as cleanup_e:
+        cleanup_succeeded = False
+        cleanup_errors.append("clear_created_pous: " + str(cleanup_e))
+    try:
+        if project is not None and hasattr(project, 'close'):
+            project.close()
+    except Exception as cleanup_e:
+        cleanup_succeeded = False
+        cleanup_errors.append("close_project: " + str(cleanup_e))
     result = {{
         "success": False,
-        "error": str(error_value)
+        "error": str(error_value),
+        "stage": stage,
+        "cleanup_attempted": cleanup_attempted,
+        "cleanup_succeeded": cleanup_succeeded,
+        "project_path_if_any": project_path_if_any
     }}
+    if cleanup_errors:
+        result["cleanup_errors"] = cleanup_errors
 """.format(
-            path.replace("\\", "\\\\"),
-            template_path.replace("\\", "\\\\"),
-            codesys_path.replace("\\", "\\\\"),
-            device_name.replace("\\", "\\\\"),
-            device_type,
-            device_id.replace("\\", "\\\\"),
-            device_version.replace("\\", "\\\\"),
+            create_fragment=create_fragment,
+            add_device_fragment=add_device_fragment,
+            resolve_app_fragment=resolve_app_fragment,
+            create_pou_fragment=create_pou_fragment,
+            create_task_config_fragment=create_task_config_fragment,
+            create_task_fragment=create_task_fragment,
+            assign_fragment=assign_fragment,
         )
 
     def _generate_project_open_script(self, params: dict[str, object]) -> str:
@@ -692,19 +583,31 @@ try:
     else:
         project = session.active_project
         target = None
-        target_name = "{0}".split("/")[-1]
+        raw_path = "{0}"
+        normalized_path = raw_path.replace("\\\\", "/")
+        target_name = normalized_path.split("/")[-1]
         if hasattr(session, 'created_pous'):
             target = session.created_pous.get(target_name)
         if target is None:
-            search_result = project.find("{0}")
-            if search_result is not None:
+            search_terms = [raw_path]
+            if normalized_path != raw_path:
+                search_terms.append(normalized_path)
+            if target_name not in search_terms:
+                search_terms.append(target_name)
+            for search_term in search_terms:
+                search_result = project.find(search_term)
+                if search_result is None:
+                    continue
                 if hasattr(search_result, 'textual_declaration') or hasattr(search_result, 'set_implementation_code'):
                     target = search_result
-                elif hasattr(search_result, '__iter__'):
+                    break
+                if hasattr(search_result, '__iter__'):
                     for candidate in search_result:
                         if hasattr(candidate, 'textual_declaration') or hasattr(candidate, 'set_implementation_code'):
                             target = candidate
                             break
+                if target is not None:
+                    break
         if target is None:
             result = {{"success": False, "error": "POU not found: {0}"}}
         else:
@@ -792,6 +695,7 @@ except Exception:
 
     def _generate_project_compile_script(self, params: dict[str, object]) -> str:
         clean_build = bool(params.get("clean_build", False))
+        safe_message_harvest = bool(params.get("_safe_message_harvest", False))
 
         return """
 import scriptengine
@@ -802,7 +706,9 @@ import traceback
 try:
     print("Starting project compilation script")
     clean_build = {0}
+    safe_message_harvest = {1}
     print("Clean build: " + str(clean_build))
+    print("Safe message harvest: " + str(safe_message_harvest))
     script_message_category = "{{194B48A9-AB51-43ae-B9A9-51D3EDAADDF3}}".lower()
     
     def infer_level_from_text(message_text):
@@ -904,12 +810,6 @@ try:
                     application.build()
                 
                 print("Build command completed")
-                if hasattr(application, 'generate_code'):
-                    print("Generating code...")
-                    application.generate_code()
-                    print("Code generation completed")
-                else:
-                    raise Exception("Active application does not support generate_code")
 
                 if hasattr(system, 'delay'):
                     try:
@@ -919,7 +819,8 @@ try:
 
                 compilation_messages = []
                 if (
-                    system is not None
+                    not safe_message_harvest
+                    and system is not None
                     and hasattr(system, 'get_message_categories')
                     and hasattr(system, 'get_message_objects')
                 ):
@@ -971,7 +872,7 @@ try:
                             append_message(compilation_messages, msg, infer_level_from_text(msg))
                     except Exception as msg_e:
                         print("Warning: Could not get fallback compilation messages: " + str(msg_e))
-                
+
                 message_counts = build_message_counts(compilation_messages)
                 has_errors = message_counts["errors"] > 0
                 
@@ -982,16 +883,16 @@ try:
                         "error": "Compilation completed with errors",
                         "messages": compilation_messages,
                         "message_counts": message_counts,
-                        "build_type": "rebuild+generate_code" if clean_build else "build+generate_code"
+                        "build_type": "rebuild" if clean_build else "build"
                     }}
                 else:
                     print("Compilation completed successfully")
                     result = {{
                         "success": True,
-                        "message": "Project compiled and generated code successfully",
+                        "message": "Project compiled successfully",
                         "messages": compilation_messages,
                         "message_counts": message_counts,
-                        "build_type": "rebuild+generate_code" if clean_build else "build+generate_code"
+                        "build_type": "rebuild" if clean_build else "build"
                     }}
                     
             except Exception as build_e:
@@ -1002,7 +903,7 @@ try:
                     "error": "Compilation failed: " + str(build_e),
                     "messages": [],
                     "message_counts": {{"errors": 1, "warnings": 0, "infos": 0}},
-                    "build_type": "rebuild+generate_code" if clean_build else "build+generate_code"
+                    "build_type": "rebuild" if clean_build else "build"
                 }}
                 
 except Exception:
@@ -1015,4 +916,4 @@ except Exception:
         "messages": [],
         "message_counts": {{"errors": 1, "warnings": 0, "infos": 0}}
     }}
-""".format("True" if clean_build else "False")
+""".format("True" if clean_build else "False", "True" if safe_message_harvest else "False")

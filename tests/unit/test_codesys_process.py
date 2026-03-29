@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import subprocess
 import threading
 import time
 from pathlib import Path
@@ -14,13 +15,17 @@ class FakeProcess:
         self,
         poll_results: list[int | None] | None = None,
         *,
+        pid: int = 4321,
         stdout_lines: list[bytes] | None = None,
         stderr_lines: list[bytes] | None = None,
     ) -> None:
         self.poll_results = poll_results or [None]
         self.poll_index = 0
+        self.pid = pid
         self.terminate_called = False
         self.kill_called = False
+        self.stdout: Any
+        self.stderr: Any
         self.stdout = FakeStream(stdout_lines or [])
         self.stderr = FakeStream(stderr_lines or [])
 
@@ -51,6 +56,13 @@ class FakeStream:
         return b""
 
 
+class NoStreamFakeProcess(FakeProcess):
+    def __init__(self, poll_results: list[int | None] | None = None, *, pid: int = 4321) -> None:
+        super().__init__(poll_results, pid=pid)
+        self.stdout = None
+        self.stderr = None
+
+
 class FakePopenFactory:
     def __init__(self, process: FakeProcess) -> None:
         self.process = process
@@ -63,6 +75,31 @@ class FakePopenFactory:
         self.command = command
         self.kwargs = kwargs
         return self.process
+
+
+class FakeCodesysProcessLister:
+    def __init__(self, responses: list[list[int]]) -> None:
+        self.responses = list(responses)
+        self.calls = 0
+
+    def __call__(self) -> list[int]:
+        self.calls += 1
+        if self.responses:
+            response = self.responses.pop(0)
+            return list(response)
+        return []
+
+
+class FakePipeReadyFn:
+    def __init__(self, responses: list[bool]) -> None:
+        self.responses = list(responses)
+        self.calls: list[tuple[str, float]] = []
+
+    def __call__(self, pipe_name: str, timeout: float) -> bool:
+        self.calls.append((pipe_name, timeout))
+        if self.responses:
+            return self.responses.pop(0)
+        return False
 
 
 def make_config(tmp_path: Path) -> ProcessManagerConfig:
@@ -108,6 +145,8 @@ def test_start_succeeds_after_successful_launch(tmp_path: Path) -> None:
     config.script_lib_dir.mkdir()
     process = FakeProcess([None, None])
     popen_factory = FakePopenFactory(process)
+    process_lister = FakeCodesysProcessLister([[100], [100, 200, 300]])
+    pipe_ready = FakePipeReadyFn([False, True])
     manager = CodesysProcessManager(
         config,
         logger=logging.getLogger("codesys_process_test"),
@@ -115,11 +154,48 @@ def test_start_succeeds_after_successful_launch(tmp_path: Path) -> None:
         sleep_fn=lambda _seconds: None,
         startup_timeout=0.0,
         initialization_wait=0.0,
-        pipe_ready_fn=lambda _pipe_name, _timeout: True,
+        pipe_ready_fn=pipe_ready,
+        codesys_process_lister=process_lister,
     )
 
     assert manager.start() is True
     assert manager.is_running() is True
+    assert popen_factory.command == manager._build_launch_command()
+    assert popen_factory.kwargs is not None
+    assert popen_factory.kwargs["shell"] is True
+    assert manager.managed_codesys_pids == {200, 300}
+    assert manager.session_ownership == "owned"
+
+
+def test_start_attaches_to_existing_named_pipe_session_without_launching_new_process(tmp_path: Path) -> None:
+    config = make_config(tmp_path)
+    pipe_ready = FakePipeReadyFn([True, True])
+    popen_factory = FakePopenFactory(FakeProcess())
+    manager = CodesysProcessManager(
+        config,
+        logger=logging.getLogger("codesys_process_test"),
+        popen_factory=popen_factory,
+        pipe_ready_fn=pipe_ready,
+    )
+
+    assert manager.start() is True
+    assert manager.session_ownership == "attached"
+    assert manager.is_running() is True
+    assert popen_factory.called is False
+    assert pipe_ready.calls[0] == ("codesys_api_test_pipe", 0.2)
+
+
+def test_start_attaches_before_requiring_local_codesys_paths(tmp_path: Path) -> None:
+    config = make_config(tmp_path)
+    pipe_ready = FakePipeReadyFn([True])
+    manager = CodesysProcessManager(
+        config,
+        logger=logging.getLogger("codesys_process_test"),
+        pipe_ready_fn=pipe_ready,
+    )
+
+    assert manager.start() is True
+    assert manager.session_ownership == "attached"
 
 
 def test_start_waits_for_named_pipe_listener_when_named_pipe_transport_is_enabled(tmp_path: Path) -> None:
@@ -136,7 +212,7 @@ def test_start_waits_for_named_pipe_listener_when_named_pipe_transport_is_enable
 
     def record_pipe_ready(pipe_name: str, timeout: float) -> bool:
         calls.append((pipe_name, timeout))
-        return True
+        return timeout == 5.0
 
     manager = CodesysProcessManager(
         config,
@@ -150,7 +226,7 @@ def test_start_waits_for_named_pipe_listener_when_named_pipe_transport_is_enable
     )
 
     assert manager.start() is True
-    assert calls == [("codesys_api_test_pipe", 5.0)]
+    assert calls == [("codesys_api_test_pipe", 0.2), ("codesys_api_test_pipe", 5.0)]
 
 
 def test_start_returns_false_when_named_pipe_listener_never_becomes_ready(tmp_path: Path) -> None:
@@ -245,6 +321,20 @@ def test_build_launch_command_uses_runtime_no_ui_override(tmp_path: Path) -> Non
     assert "--noUI" not in command
 
 
+def test_build_launch_args_include_profile_and_runtime_flags(tmp_path: Path) -> None:
+    config = make_config(tmp_path)
+    manager = CodesysProcessManager(config, logger=logging.getLogger("codesys_process_test"))
+
+    command_args = manager._build_launch_args()
+
+    assert command_args == [
+        str(config.codesys_path),
+        '--profile="CODESYS V3.5 SP20 Patch 5"',
+        "--noUI",
+        '--runscript="{0}"'.format(config.script_path),
+    ]
+
+
 def test_reset_runtime_mode_restores_configured_no_ui_mode(tmp_path: Path) -> None:
     config = make_config(tmp_path)
     manager = CodesysProcessManager(config, logger=logging.getLogger("codesys_process_test"))
@@ -283,7 +373,13 @@ def test_stop_requests_graceful_named_pipe_shutdown_before_fallback(tmp_path: Pa
 
 def test_stop_uses_terminate_and_kill_when_process_stays_running(tmp_path: Path) -> None:
     config = make_config(tmp_path)
-    process = FakeProcess([None, None, None, None, None, None])
+    process = FakeProcess([None, None, None, None])
+    taskkill_calls: list[list[str]] = []
+
+    def record_taskkill(command: list[str]) -> subprocess.CompletedProcess[str]:
+        taskkill_calls.append(command)
+        return subprocess.CompletedProcess(command, 0, "", "")
+
     manager = CodesysProcessManager(
         config,
         logger=logging.getLogger("codesys_process_test"),
@@ -291,14 +387,193 @@ def test_stop_uses_terminate_and_kill_when_process_stays_running(tmp_path: Path)
         stop_timeout=0.0,
         post_terminate_wait=0.0,
         shutdown_request_fn=lambda _pipe_name, _timeout: {"success": False, "error": "no response"},
+        taskkill_runner=record_taskkill,
+        codesys_process_lister=FakeCodesysProcessLister([[]]),
     )
     manager.process = process
     manager.running = True
 
     assert manager.stop() is True
     assert process.terminate_called is True
+    assert taskkill_calls == [["taskkill", "/PID", "4321", "/T", "/F"]]
     assert process.kill_called is True
     assert manager.process is None
+
+
+def test_stop_uses_taskkill_process_tree_without_kill_when_tree_cleanup_finishes_shutdown(tmp_path: Path) -> None:
+    config = make_config(tmp_path)
+    process = FakeProcess([None, None, None, 0], pid=9876)
+    taskkill_calls: list[list[str]] = []
+
+    def record_taskkill(command: list[str]) -> subprocess.CompletedProcess[str]:
+        taskkill_calls.append(command)
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    manager = CodesysProcessManager(
+        config,
+        logger=logging.getLogger("codesys_process_test"),
+        sleep_fn=lambda _seconds: None,
+        stop_timeout=0.0,
+        post_terminate_wait=0.0,
+        shutdown_request_fn=lambda _pipe_name, _timeout: {"success": False, "error": "no response"},
+        taskkill_runner=record_taskkill,
+        codesys_process_lister=FakeCodesysProcessLister([[]]),
+    )
+    manager.process = process
+    manager.running = True
+
+    assert manager.stop() is True
+    assert process.terminate_called is True
+    assert taskkill_calls == [["taskkill", "/PID", "9876", "/T", "/F"]]
+    assert process.kill_called is False
+    assert manager.process is None
+
+
+def test_stop_taskkills_tracked_ide_pid_even_when_shell_launcher_has_already_exited(tmp_path: Path) -> None:
+    config = make_config(tmp_path)
+    process = FakeProcess([0], pid=1111)
+    taskkill_calls: list[list[str]] = []
+
+    def record_taskkill(command: list[str]) -> subprocess.CompletedProcess[str]:
+        taskkill_calls.append(command)
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    manager = CodesysProcessManager(
+        config,
+        logger=logging.getLogger("codesys_process_test"),
+        sleep_fn=lambda _seconds: None,
+        stop_timeout=0.0,
+        post_terminate_wait=0.0,
+        shutdown_request_fn=lambda _pipe_name, _timeout: {"success": True},
+        taskkill_runner=record_taskkill,
+        codesys_process_lister=FakeCodesysProcessLister([[2222], [2222], []]),
+    )
+    manager.process = process
+    manager.running = True
+    manager.managed_codesys_pids = {2222}
+
+    assert manager.stop() is True
+    assert process.terminate_called is False
+    assert process.kill_called is False
+
+
+def test_stop_attached_session_skips_taskkill_when_no_orphan_processes(tmp_path: Path) -> None:
+    config = make_config(tmp_path)
+    pipe_ready = FakePipeReadyFn([True, False])
+    calls: list[tuple[str, int]] = []
+    taskkill_calls: list[list[str]] = []
+
+    def record_shutdown(pipe_name: str, timeout: int) -> dict[str, object]:
+        calls.append((pipe_name, timeout))
+        return {"success": True}
+
+    def record_taskkill(command: list[str]) -> subprocess.CompletedProcess[str]:
+        taskkill_calls.append(command)
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    manager = CodesysProcessManager(
+        config,
+        logger=logging.getLogger("codesys_process_test"),
+        sleep_fn=lambda _seconds: None,
+        stop_timeout=1.0,
+        pipe_ready_fn=pipe_ready,
+        shutdown_request_fn=record_shutdown,
+        taskkill_runner=record_taskkill,
+        codesys_process_lister=FakeCodesysProcessLister([[]]),
+    )
+
+    assert manager.stop() is True
+    assert manager.session_ownership == "none"
+    assert calls == [("codesys_api_test_pipe", 1)]
+    assert taskkill_calls == []
+
+
+def test_stop_attached_session_taskkills_orphan_codesys_processes(tmp_path: Path) -> None:
+    config = make_config(tmp_path)
+    pipe_ready = FakePipeReadyFn([True, False])
+    taskkill_calls: list[list[str]] = []
+
+    def record_taskkill(command: list[str]) -> subprocess.CompletedProcess[str]:
+        taskkill_calls.append(command)
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    manager = CodesysProcessManager(
+        config,
+        logger=logging.getLogger("codesys_process_test"),
+        sleep_fn=lambda _seconds: None,
+        stop_timeout=1.0,
+        pipe_ready_fn=pipe_ready,
+        shutdown_request_fn=lambda pipe_name, timeout: {"success": True},
+        taskkill_runner=record_taskkill,
+        codesys_process_lister=FakeCodesysProcessLister([[9999], [9999], []]),
+    )
+
+    assert manager.stop() is True
+    assert manager.session_ownership == "none"
+    assert taskkill_calls == [["taskkill", "/PID", "9999", "/T", "/F"]]
+
+
+def test_stop_attached_session_returns_false_when_pipe_stays_available(tmp_path: Path) -> None:
+    config = make_config(tmp_path)
+    pipe_ready = FakePipeReadyFn([True, True])
+    calls: list[tuple[str, int]] = []
+    sleep_calls: list[float] = []
+
+    def record_shutdown(pipe_name: str, timeout: int) -> dict[str, object]:
+        calls.append((pipe_name, timeout))
+        return {"success": True}
+
+    manager = CodesysProcessManager(
+        config,
+        logger=logging.getLogger("codesys_process_test"),
+        sleep_fn=sleep_calls.append,
+        stop_timeout=0.0,
+        pipe_ready_fn=pipe_ready,
+        shutdown_request_fn=record_shutdown,
+        codesys_process_lister=FakeCodesysProcessLister([[]]),
+    )
+
+    assert manager.stop() is False
+    assert calls == [("codesys_api_test_pipe", 1)]
+    assert sleep_calls == []
+
+
+def test_stop_only_taskkills_newly_tracked_ide_pids(tmp_path: Path) -> None:
+    config = make_config(tmp_path)
+    process = NoStreamFakeProcess([None, None, None, 0], pid=1111)
+    taskkill_calls: list[list[str]] = []
+    pipe_ready = FakePipeReadyFn([False, True])
+
+    def record_taskkill(command: list[str]) -> subprocess.CompletedProcess[str]:
+        taskkill_calls.append(command)
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    manager = CodesysProcessManager(
+        config,
+        logger=logging.getLogger("codesys_process_test"),
+        sleep_fn=lambda _seconds: None,
+        startup_timeout=0.0,
+        initialization_wait=0.0,
+        stop_timeout=0.0,
+        pipe_ready_fn=pipe_ready,
+        popen_factory=FakePopenFactory(process),
+        taskkill_runner=record_taskkill,
+        shutdown_request_fn=lambda _pipe_name, _timeout: {"success": True},
+        codesys_process_lister=FakeCodesysProcessLister([[100], [100, 200]]),
+    )
+    config.codesys_path.write_text("exe", encoding="utf-8")
+    config.script_path.write_text("# script", encoding="utf-8")
+    assert config.profile_path is not None
+    config.profile_path.parent.mkdir(parents=True, exist_ok=True)
+    config.profile_path.write_text("<Profile />", encoding="utf-8")
+    config.script_lib_dir.mkdir()
+
+    assert manager.start() is True
+    assert manager.managed_codesys_pids == {200}
+    manager.process = NoStreamFakeProcess([0], pid=1111)
+    manager.codesys_process_lister = FakeCodesysProcessLister([[200], [200], []])
+    assert manager.stop() is True
+    assert taskkill_calls == [["taskkill", "/PID", "200", "/T", "/F"]]
 
 
 def test_get_status_returns_unknown_when_process_is_not_running(tmp_path: Path) -> None:
@@ -341,7 +616,7 @@ def test_start_captures_process_stdout_and_stderr_into_log_buffer(tmp_path: Path
         sleep_fn=lambda _seconds: time.sleep(0.01),
         startup_timeout=0.0,
         initialization_wait=0.0,
-        pipe_ready_fn=lambda _pipe_name, _timeout: True,
+        pipe_ready_fn=FakePipeReadyFn([False, True]),
     )
 
     assert manager.start() is True
