@@ -10,6 +10,7 @@ def test_repo_root_keeps_only_formal_entrypoints_and_metadata() -> None:
     expected_root_files = {
         ".gitignore",
         "AGENTS.md",
+        "CLAUDE.md",
         "HTTP_SERVER.py",
         "LICENSE",
         "PERSISTENT_SESSION.py",
@@ -22,8 +23,11 @@ def test_repo_root_keeps_only_formal_entrypoints_and_metadata() -> None:
         "uninstall.bat",
         "windows_service.py",
     }
+    allowed_local_files = {
+        ".env.real-codesys.local",
+    }
 
-    actual_root_files = {path.name for path in REPO_ROOT.iterdir() if path.is_file()}
+    actual_root_files = {path.name for path in REPO_ROOT.iterdir() if path.is_file()} - allowed_local_files
 
     assert actual_root_files == expected_root_files
 

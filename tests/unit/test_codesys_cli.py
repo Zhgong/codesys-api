@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import io
 import json
+import logging
 from pathlib import Path
 from typing import Any, cast
 
 from codesys_api.action_layer import ActionRequest, ActionResult
 import codesys_api.cli_entry as codesys_cli
 from codesys_api.cli_entry import run_cli
+import pytest
 
 
 class FakeActionService:
@@ -18,6 +20,20 @@ class FakeActionService:
     def execute(self, request: ActionRequest) -> ActionResult:
         self.requests.append(request)
         return self.result
+
+
+@pytest.fixture
+def repo_root_path() -> Path:
+    return Path(__file__).resolve().parents[2]
+
+
+def _reset_cli_logger_state() -> None:
+    handler = codesys_cli._CLI_LOGGING_HANDLER
+    if handler is not None:
+        codesys_cli.logger.removeHandler(handler)
+        handler.close()
+    codesys_cli._CLI_LOGGING_HANDLER = None
+    codesys_cli._CLI_LOGGING_CONFIGURED = False
 
 
 def test_cli_session_start_uses_action_layer_and_prints_human_message() -> None:
@@ -45,6 +61,9 @@ def test_cli_root_help_includes_examples_and_returns_success() -> None:
     assert "session start" in help_text
     assert "named_pipe only" in help_text
     assert "Exit codes: 0=success, 1=business/runtime failure, 2=setup/input error" in help_text
+    assert "Each CLI invocation executes one action." in help_text
+    assert "CODESYS_API_PIPE_NAME" in help_text
+    assert "codesys-tools-server" in help_text
 
 
 def test_cli_project_help_returns_success() -> None:
@@ -83,6 +102,29 @@ def test_cli_pou_help_returns_success() -> None:
     assert "pou create" in help_text
     assert "pou list --parent-path Application" in help_text
     assert "pou code --path Application\\PLC_PRG" in help_text
+
+
+def test_cli_pou_code_help_includes_supported_path_formats() -> None:
+    stdout = io.StringIO()
+
+    exit_code = run_cli(["pou", "code", "--help"], stdout=stdout)
+
+    assert exit_code == 0
+    help_text = stdout.getvalue()
+    assert "CounterFB" in help_text
+    assert "Application/CounterFB" in help_text
+    assert "Application\\CounterFB" in help_text
+
+
+def test_cli_project_compile_help_includes_no_ui_and_header_warning() -> None:
+    stdout = io.StringIO()
+
+    exit_code = run_cli(["project", "compile", "--help"], stdout=stdout)
+
+    assert exit_code == 0
+    help_text = stdout.getvalue()
+    assert "CODESYS_API_CODESYS_NO_UI=1" in help_text
+    assert "FUNCTION_BLOCK/PROGRAM header line" in help_text
 
 
 def test_cli_session_restart_maps_action_and_prints_message() -> None:
@@ -324,88 +366,79 @@ def test_cli_pou_code_missing_input_file_returns_usage_error() -> None:
     assert service.requests == []
 
 
-def test_cli_reports_missing_profile_before_runtime_build(monkeypatch: Any, tmp_path: Path) -> None:
+def test_cli_reports_missing_profile_before_runtime_build(monkeypatch: Any, repo_root_path: Path) -> None:
     class FakeConfig:
         transport_name = "named_pipe"
         transport_is_supported = True
-        codesys_path = tmp_path / "CODESYS.exe"
+        codesys_path = repo_root_path / "README.md"
         codesys_profile_name = None
         codesys_profile_path = None
 
     stderr = io.StringIO()
     monkeypatch.setattr(codesys_cli, "load_server_config", lambda base_dir, env: FakeConfig())
 
-    exit_code = run_cli(["session", "start"], stderr=stderr, base_dir=tmp_path, env={})
+    exit_code = run_cli(["session", "start"], stderr=stderr, base_dir=repo_root_path, env={})
 
     assert exit_code == 2
     assert "CODESYS profile is not configured" in stderr.getvalue()
 
 
-def test_cli_reports_missing_codesys_executable_before_runtime_build(monkeypatch: Any, tmp_path: Path) -> None:
+def test_cli_reports_missing_codesys_executable_before_runtime_build(monkeypatch: Any, repo_root_path: Path) -> None:
     class FakeConfig:
         transport_name = "named_pipe"
         transport_is_supported = True
-        codesys_path = tmp_path / "missing.exe"
+        codesys_path = repo_root_path / "missing.exe"
         codesys_profile_name = "Demo"
         codesys_profile_path = None
 
     stderr = io.StringIO()
     monkeypatch.setattr(codesys_cli, "load_server_config", lambda base_dir, env: FakeConfig())
 
-    exit_code = run_cli(["session", "start"], stderr=stderr, base_dir=tmp_path, env={})
+    exit_code = run_cli(["session", "start"], stderr=stderr, base_dir=repo_root_path, env={})
 
     assert exit_code == 2
     assert "CODESYS executable not found" in stderr.getvalue()
 
 
-def test_cli_reports_unsupported_transport_before_runtime_build(monkeypatch: Any, tmp_path: Path) -> None:
-    codesys_exe = tmp_path / "CODESYS.exe"
-    codesys_exe.write_text("", encoding="utf-8")
-
+def test_cli_reports_unsupported_transport_before_runtime_build(monkeypatch: Any, repo_root_path: Path) -> None:
     class FakeConfig:
         transport_name = "file"
         transport_is_supported = False
-        codesys_path = codesys_exe
+        codesys_path = repo_root_path / "README.md"
         codesys_profile_name = "Demo"
         codesys_profile_path = None
 
     stderr = io.StringIO()
     monkeypatch.setattr(codesys_cli, "load_server_config", lambda base_dir, env: FakeConfig())
 
-    exit_code = run_cli(["session", "start"], stderr=stderr, base_dir=tmp_path, env={})
+    exit_code = run_cli(["session", "start"], stderr=stderr, base_dir=repo_root_path, env={})
 
     assert exit_code == 2
     assert "supports named_pipe only" in stderr.getvalue()
 
 
-def test_cli_reports_missing_profile_path_before_runtime_build(monkeypatch: Any, tmp_path: Path) -> None:
-    codesys_exe = tmp_path / "CODESYS.exe"
-    codesys_exe.write_text("", encoding="utf-8")
-
+def test_cli_reports_missing_profile_path_before_runtime_build(monkeypatch: Any, repo_root_path: Path) -> None:
     class FakeConfig:
         transport_name = "named_pipe"
         transport_is_supported = True
-        codesys_path = codesys_exe
+        codesys_path = repo_root_path / "README.md"
         codesys_profile_name = "Demo"
-        codesys_profile_path = tmp_path / "missing.profile.xml"
+        codesys_profile_path = repo_root_path / "missing.profile.xml"
 
     stderr = io.StringIO()
     monkeypatch.setattr(codesys_cli, "load_server_config", lambda base_dir, env: FakeConfig())
 
-    exit_code = run_cli(["session", "start"], stderr=stderr, base_dir=tmp_path, env={})
+    exit_code = run_cli(["session", "start"], stderr=stderr, base_dir=repo_root_path, env={})
 
     assert exit_code == 2
     assert "CODESYS profile file not found" in stderr.getvalue()
 
 
-def test_cli_reports_runtime_builder_value_error(monkeypatch: Any, tmp_path: Path) -> None:
-    codesys_exe = tmp_path / "CODESYS.exe"
-    codesys_exe.write_text("", encoding="utf-8")
-
+def test_cli_reports_runtime_builder_value_error(monkeypatch: Any, repo_root_path: Path) -> None:
     class FakeConfig:
         transport_name = "named_pipe"
         transport_is_supported = True
-        codesys_path = codesys_exe
+        codesys_path = repo_root_path / "README.md"
         codesys_profile_name = "Demo"
         codesys_profile_path = None
 
@@ -413,17 +446,54 @@ def test_cli_reports_runtime_builder_value_error(monkeypatch: Any, tmp_path: Pat
     monkeypatch.setattr(codesys_cli, "load_server_config", lambda base_dir, env: FakeConfig())
     monkeypatch.setattr(codesys_cli, "build_app_runtime", lambda config, logger: (_ for _ in ()).throw(ValueError("boom")))
 
-    exit_code = run_cli(["session", "start"], stderr=stderr, base_dir=tmp_path, env={})
+    exit_code = run_cli(["session", "start"], stderr=stderr, base_dir=repo_root_path, env={})
 
     assert exit_code == 2
     assert stderr.getvalue().strip() == "boom"
 
 
-def test_cli_pou_code_reads_file_inputs(tmp_path: Path) -> None:
-    declaration = tmp_path / "decl.txt"
-    implementation = tmp_path / "impl.txt"
-    declaration.write_text("FUNCTION_BLOCK Demo", encoding="utf-8")
-    implementation.write_text("Output := TRUE;", encoding="utf-8")
+def test_cli_configures_file_logger_and_disables_propagation(tmp_path: Path) -> None:
+    _reset_cli_logger_state()
+    appdata = tmp_path / "Roaming"
+    appdata.mkdir(parents=True, exist_ok=True)
+
+    try:
+        codesys_cli._configure_cli_logging({"APPDATA": str(appdata)})
+        codesys_cli.logger.warning("cli-warning-for-file")
+        if codesys_cli._CLI_LOGGING_HANDLER is not None:
+            codesys_cli._CLI_LOGGING_HANDLER.flush()
+
+        assert codesys_cli.logger.propagate is False
+        assert isinstance(codesys_cli._CLI_LOGGING_HANDLER, logging.FileHandler)
+        log_file = appdata / "codesys-api" / "logs" / "codesys_api_cli.log"
+        assert log_file.exists()
+        assert "cli-warning-for-file" in log_file.read_text(encoding="utf-8")
+    finally:
+        _reset_cli_logger_state()
+
+
+def test_cli_logging_fallback_uses_null_handler_without_stderr_leak(monkeypatch: Any, capsys: Any) -> None:
+    _reset_cli_logger_state()
+    monkeypatch.setattr(
+        codesys_cli,
+        "default_runtime_log_dir",
+        lambda env: (_ for _ in ()).throw(OSError("permission denied")),
+    )
+
+    try:
+        codesys_cli._configure_cli_logging({"APPDATA": r"C:\does-not-matter"})
+        codesys_cli.logger.warning("cli-warning-with-null-handler")
+        captured = capsys.readouterr()
+
+        assert isinstance(codesys_cli._CLI_LOGGING_HANDLER, logging.NullHandler)
+        assert captured.err == ""
+    finally:
+        _reset_cli_logger_state()
+
+
+def test_cli_pou_code_reads_file_inputs(repo_root_path: Path) -> None:
+    declaration = repo_root_path / "docs" / "BASELINE.md"
+    implementation = repo_root_path / "README.md"
     service = FakeActionService(ActionResult(body={"success": True, "message": "POU code updated successfully"}))
 
     exit_code = run_cli(
@@ -444,6 +514,6 @@ def test_cli_pou_code_reads_file_inputs(tmp_path: Path) -> None:
     assert exit_code == 0
     assert service.requests[0].params == {
         "path": "Application/Demo",
-        "declaration": "FUNCTION_BLOCK Demo",
-        "implementation": "Output := TRUE;",
+        "declaration": declaration.read_text(encoding="utf-8"),
+        "implementation": implementation.read_text(encoding="utf-8"),
     }

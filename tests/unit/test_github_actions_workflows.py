@@ -57,3 +57,13 @@ def test_verify_published_package_workflow_installs_exact_target_version() -> No
     assert "windows-latest" in workflow
     assert 'python-version: "3.14"' in workflow
     assert r"python scripts\verify_installed_package.py" in workflow
+
+
+def test_github_actions_do_not_enable_real_codesys_e2e() -> None:
+    ci_workflow = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    release_workflow = (REPO_ROOT / ".github" / "workflows" / "release-build.yml").read_text(encoding="utf-8")
+    publish_workflow = (REPO_ROOT / ".github" / "workflows" / "publish.yml").read_text(encoding="utf-8")
+
+    assert "CODESYS_E2E_ENABLE" not in ci_workflow
+    assert "CODESYS_E2E_ENABLE" not in release_workflow
+    assert "CODESYS_E2E_ENABLE" not in publish_workflow

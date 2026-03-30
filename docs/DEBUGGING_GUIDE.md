@@ -24,6 +24,18 @@ This guide provides step-by-step instructions for troubleshooting connection iss
    This starts the complete HTTP server that connects to CODESYS.
    Test with: `python scripts\manual\example_client.py` in another window.
 
+4. **Run Real CODESYS E2E From A Normal User Terminal**
+   ```
+   python scripts\manual\run_real_codesys_e2e.py
+   ```
+   Use this for the real HTTP main flow. The runner loads `.env.real-codesys.local`, refuses to run from the Codex sandbox identity, and now defaults real E2E to UI mode instead of `--noUI`.
+
+5. **Probe Python Launch Shape When Profile Auto-Selection Regresses**
+   ```
+   python scripts\manual\profile_launch_probe.py --mode all
+   ```
+   Use this when the same manual CODESYS command works but Python-launched CODESYS starts prompting for a profile.
+
 ## Detailed Debugging Steps
 
 If you're experiencing connection issues, follow these steps:
@@ -89,6 +101,22 @@ Then check the log file after running the server.
 - Check the CODESYS path
 - Run CODESYS manually to verify it works
 - Check for permissions issues
+- If CODESYS starts manually in your own terminal but fails when launched by Codex, compare the Windows identity. Sandbox-launched CODESYS can fail before script startup with `CODESYS.APInstaller.CLI.Program` / `AP Installer` Event Log access errors even when the same command works for the logged-in user.
+- If the manual `CODESYS.exe --profile="..." --runscript="..."` command works but Python startup prompts for a profile, compare Python launch modes with `profile_launch_probe.py`. The current product default should follow the `shell_string` startup shape.
+
+#### Real E2E Compile Fails After Working Setup Steps
+
+**Cause**: The compile may succeed, but the noUI compile fallback can still fail while restoring the original runtime.
+**What happens**:
+- noUI runtime is stopped
+- CODESYS is restarted in UI mode for compile
+- compile succeeds
+- the service switches back to noUI mode and reopens the project
+- CODESYS still holds the project lock, so reopen fails with "currently being used" style errors
+
+**Current workaround**:
+- Use `python scripts\manual\run_real_codesys_e2e.py` and keep its default `CODESYS_E2E_NO_UI=0`
+- Only force `CODESYS_E2E_NO_UI=1` when you are specifically debugging the noUI compatibility path
 
 #### Script Execution Timeouts
 

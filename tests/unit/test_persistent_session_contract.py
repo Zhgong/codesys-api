@@ -27,7 +27,9 @@ def test_persistent_session_named_pipe_flow_uses_normalization_helpers() -> None
     assert "request = self.normalize_named_pipe_request(self.read_named_pipe_request(server))" in source
     assert "result = self.normalize_named_pipe_result(result, request_id)" in source
     assert "self.write_named_pipe_result(server, self.build_named_pipe_failure_response(request_id, str(e)))" in source
-    assert 'self.request_thread = threading.Thread(target=self.process_named_pipe_requests)' in source
+    assert 'self.log("Entering named pipe request loop on primary thread")' in source
+    assert "self.process_named_pipe_requests()" in source
+    assert "threading.Thread(target=self.process_named_pipe_requests)" not in source
     assert "target=self.process_requests" not in source
 
 

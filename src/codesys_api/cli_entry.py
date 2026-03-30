@@ -12,14 +12,45 @@ from typing import Protocol, TextIO, cast
 
 from .action_layer import ActionRequest, ActionResult, ActionType
 from .app_runtime import build_app_runtime
+from .runtime_paths import default_runtime_log_dir
 from .server_config import load_server_config
 
 
 logger = logging.getLogger("codesys_api_cli")
+_CLI_LOGGING_CONFIGURED = False
+_CLI_LOGGING_HANDLER: logging.Handler | None = None
 
 
 class ActionServiceLike(Protocol):
     def execute(self, request: ActionRequest) -> ActionResult: ...
+
+
+def _configure_cli_logging(env: Mapping[str, str]) -> None:
+    """Route internal CLI logs to file so --json stderr stays machine-friendly."""
+    global _CLI_LOGGING_CONFIGURED
+    global _CLI_LOGGING_HANDLER
+
+    if _CLI_LOGGING_CONFIGURED:
+        return
+
+    logger.setLevel(logging.INFO)
+    logger.propagate = False
+
+    try:
+        log_dir = default_runtime_log_dir(env)
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_file = log_dir / "codesys_api_cli.log"
+        handler: logging.Handler = logging.FileHandler(str(log_file), encoding="utf-8")
+        handler.setFormatter(
+            logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+        )
+    except Exception:
+        # Prevent logging.lastResort fallback from polluting stderr.
+        handler = logging.NullHandler()
+
+    logger.addHandler(handler)
+    _CLI_LOGGING_HANDLER = handler
+    _CLI_LOGGING_CONFIGURED = True
 
 
 def _build_usage_examples() -> str:
@@ -34,7 +65,11 @@ def _build_usage_examples() -> str:
         "  Transport: named_pipe only\n"
         "  Default output: human-readable text\n"
         "  Structured output: --json\n"
-        "  Exit codes: 0=success, 1=business/runtime failure, 2=setup/input error"
+        "  Exit codes: 0=success, 1=business/runtime failure, 2=setup/input error\n\n"
+        "Important:\n"
+        "  Each CLI invocation executes one action.\n"
+        "  Reuse the same CODESYS_API_PIPE_NAME to attach to an existing session\n"
+        "  across commands, or use codesys-tools-server for HTTP workflows."
     )
 
 
@@ -64,6 +99,25 @@ def _build_pou_help_examples() -> str:
         "  codesys-tools pou create --name MotorController --type FunctionBlock --language ST\n"
         "  codesys-tools pou list --parent-path Application\n"
         "  codesys-tools pou code --path Application\\PLC_PRG --implementation-file plc_prg_impl.txt"
+    )
+
+
+def _build_project_compile_help() -> str:
+    return (
+        "Compile the active project.\n\n"
+        "Notes:\n"
+        "  Works in both UI and noUI mode.\n"
+        "  Set CODESYS_API_CODESYS_NO_UI=1 to launch CODESYS without a visible UI.\n"
+        "  POU declaration text must omit the FUNCTION_BLOCK/PROGRAM header line and start at the VAR sections."
+    )
+
+
+def _build_pou_code_help() -> str:
+    return (
+        "Update POU declaration and/or implementation text.\n\n"
+        "Path formats:\n"
+        "  --path accepts a bare POU name (for example CounterFB)\n"
+        "  or a tree path using either Application/CounterFB or Application\\CounterFB."
     )
 
 
@@ -104,7 +158,12 @@ def build_parser() -> argparse.ArgumentParser:
     project_subparsers.add_parser("save", help="Save the active project")
     project_subparsers.add_parser("close", help="Close the active project")
     project_subparsers.add_parser("list", help="List recent projects")
-    project_compile = project_subparsers.add_parser("compile", help="Compile the active project")
+    project_compile = project_subparsers.add_parser(
+        "compile",
+        help="Compile the active project",
+        description=_build_project_compile_help(),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     project_compile.add_argument("--clean-build", action="store_true", default=False)
 
     pou_parser = subparsers.add_parser(
@@ -121,8 +180,17 @@ def build_parser() -> argparse.ArgumentParser:
     pou_create.add_argument("--language", required=True)
     pou_list = pou_subparsers.add_parser("list", help="List POUs")
     pou_list.add_argument("--parent-path", default="Application")
-    pou_code = pou_subparsers.add_parser("code", help="Set POU code")
-    pou_code.add_argument("--path", required=True)
+    pou_code = pou_subparsers.add_parser(
+        "code",
+        help="Set POU code",
+        description=_build_pou_code_help(),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    pou_code.add_argument(
+        "--path",
+        required=True,
+        help="POU name or tree path, for example CounterFB, Application/CounterFB, or Application\\CounterFB",
+    )
     pou_code.add_argument("--declaration-file")
     pou_code.add_argument("--implementation-file")
 
@@ -334,6 +402,7 @@ def run_cli(
     if runtime_service is None:
         resolved_base_dir = base_dir or Path.cwd()
         resolved_env = env or os.environ
+        _configure_cli_logging(resolved_env)
         config = load_server_config(resolved_base_dir, resolved_env)
         config_error = _validate_runtime_configuration(config)
         if config_error is not None:

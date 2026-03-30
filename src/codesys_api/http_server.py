@@ -27,6 +27,7 @@ from typing import Any
 from .action_layer import ActionRequest, ActionType
 from .app_runtime import build_app_runtime
 from .api_key_store import ApiKeyManager
+from .help_text import SERVER_HELP_DESCRIPTION, build_server_help_epilog
 from .runtime_paths import default_runtime_log_dir
 from .server_config import load_server_config
 
@@ -115,6 +116,15 @@ class CodesysApiHandler(BaseHTTPRequestHandler):
         self.api_key_manager = kwargs.pop('api_key_manager', None)
         self.actions_service = kwargs.pop('actions_service', None)
         BaseHTTPRequestHandler.__init__(self, *args, **kwargs)
+
+    def log_message(self, format, *args):
+        """Log HTTP access lines to file logger instead of stderr."""
+        try:
+            message = format % args
+        except Exception:
+            message = str(format)
+        client = self.client_address[0] if self.client_address else "unknown"
+        logger.info("%s - - [%s] %s", client, self.log_date_time_string(), message)
         
     def do_GET(self):
         """Handle GET requests."""
@@ -487,7 +497,7 @@ def run_server():
         print("Server stopped")
     except Exception as e:
         print("Error starting server: " + str(e))
-        logger.error("Error starting server: %s", str(e))
+        logger.error("Error starting server: %s", str(e), exc_info=True)
     finally:
         # Stop CODESYS process
         if 'process_manager' in locals():
@@ -496,7 +506,9 @@ def run_server():
 
 def build_parser() -> argparse.ArgumentParser:
     return argparse.ArgumentParser(
-        description="Run the local CODESYS API HTTP server.",
+        description=SERVER_HELP_DESCRIPTION,
+        epilog=build_server_help_epilog(),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 
 

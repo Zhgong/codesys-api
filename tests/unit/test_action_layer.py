@@ -15,13 +15,19 @@ class FakeProcessManager:
         running: bool,
         start_result: bool = True,
         stop_result: bool = True,
+        configured_no_ui: bool = False,
+        start_results: list[bool] | None = None,
+        stop_results: list[bool] | None = None,
     ) -> None:
         self.running = running
         self.start_result = start_result
         self.stop_result = stop_result
+        self.start_results = list(start_results or [])
+        self.stop_results = list(stop_results or [])
         self.start_calls = 0
         self.stop_calls = 0
-        self.no_ui_mode = False
+        self.configured_no_ui = configured_no_ui
+        self.no_ui_mode = configured_no_ui
         self.reset_runtime_mode_calls = 0
 
     def is_running(self) -> bool:
@@ -29,15 +35,17 @@ class FakeProcessManager:
 
     def start(self) -> bool:
         self.start_calls += 1
-        if self.start_result:
+        result = self.start_results.pop(0) if self.start_results else self.start_result
+        if result:
             self.running = True
-        return self.start_result
+        return result
 
     def stop(self) -> bool:
         self.stop_calls += 1
-        if self.stop_result:
+        result = self.stop_results.pop(0) if self.stop_results else self.stop_result
+        if result:
             self.running = False
-        return self.stop_result
+        return result
 
     def get_status(self) -> dict[str, object]:
         return {"state": "running", "timestamp": 123.0}
@@ -50,7 +58,7 @@ class FakeProcessManager:
 
     def reset_runtime_mode(self) -> None:
         self.reset_runtime_mode_calls += 1
-        self.no_ui_mode = False
+        self.no_ui_mode = self.configured_no_ui
 
 
 class FakeScriptExecutor:
@@ -118,6 +126,17 @@ class FakeEngineAdapter:
         result = dict(raw_result)
         result.setdefault("normalized_by", action)
         return result
+
+
+class RecordingCompileEngineAdapter(FakeEngineAdapter):
+    def __init__(self) -> None:
+        super().__init__()
+        self.compile_params: list[dict[str, object]] = []
+
+    def build_execution(self, action: str, params: dict[str, object]) -> ExecutionSpec:
+        if action == "project.compile":
+            self.compile_params.append(dict(params))
+        return super().build_execution(action, params)
 
 
 def make_service(
@@ -355,23 +374,12 @@ def test_project_compile_returns_unsupported_when_engine_lacks_capability() -> N
     }
 
 
-def test_project_compile_restarts_in_ui_mode_when_no_ui_is_active() -> None:
-    process_manager = FakeProcessManager(running=True)
-    process_manager.no_ui_mode = True
-    script_executor = FakeScriptExecutor(
-        results=[
-            {"success": True, "status": {"project": {"path": r"C:\repo\Demo.project"}}},
-            {"success": True, "message": "saved"},
-            {"success": True, "message": "closed"},
-            {"success": True, "message": "session started"},
-            {"success": True, "project": {"path": r"C:\repo\Demo.project"}},
-            {"success": True, "message": "compiled"},
-        ]
-    )
+def test_project_compile_uses_full_message_harvest() -> None:
+    adapter = RecordingCompileEngineAdapter()
     service = ActionService(
-        process_manager=process_manager,
-        script_executor=script_executor,
-        engine_adapter=FakeEngineAdapter(),
+        process_manager=FakeProcessManager(running=True, configured_no_ui=False),
+        script_executor=FakeScriptExecutor({"success": True, "message": "compiled"}),
+        engine_adapter=adapter,
         logger=logging.getLogger("action-layer-test"),
         now_fn=lambda: 999.0,
         script_dir=Path(r"C:\repo"),
@@ -383,35 +391,19 @@ def test_project_compile_restarts_in_ui_mode_when_no_ui_is_active() -> None:
     )
 
     assert result.status_code == 200
-    assert result.body == {
-        "success": True,
-        "message": "compiled",
-        "normalized_by": "project.compile",
-    }
-    assert process_manager.no_ui_mode is False
-    assert process_manager.stop_calls == 1
-    assert process_manager.start_calls == 1
-    assert [call[0] for call in script_executor.calls] == [
-        "status-script",
-        "project-save",
-        "project-close",
-        "start-script",
-        r"project-open:C:\repo\Demo.project",
-        "project-compile:False",
-    ]
+    assert result.body["success"] is True
+    assert adapter.compile_params == [{"clean_build": False, "_safe_message_harvest": False}]
 
 
-def test_project_compile_fallback_fails_when_project_path_cannot_be_recovered() -> None:
-    process_manager = FakeProcessManager(running=True)
-    process_manager.no_ui_mode = True
-    service = ActionService(
-        process_manager=process_manager,
-        script_executor=FakeScriptExecutor(results=[{"success": True, "status": {}}]),
-        engine_adapter=FakeEngineAdapter(),
-        logger=logging.getLogger("action-layer-test"),
-        now_fn=lambda: 999.0,
-        script_dir=Path(r"C:\repo"),
-        sleep_fn=lambda _seconds: None,
+def test_project_compile_returns_compile_error_payload_as_http_500() -> None:
+    service = make_service(
+        running=True,
+        script_result={
+            "success": False,
+            "error": "Compilation completed with errors",
+            "messages": [{"text": "C0032: MissingVar", "level": "error"}],
+            "message_counts": {"errors": 1, "warnings": 0, "infos": 0},
+        },
     )
 
     result = service.execute(
@@ -419,138 +411,9 @@ def test_project_compile_fallback_fails_when_project_path_cannot_be_recovered() 
     )
 
     assert result.status_code == 500
-    assert result.body == {
-        "success": False,
-        "error": "Cannot recover active project path for noUI compile fallback",
-    }
-
-
-def test_project_compile_fallback_returns_error_when_stop_fails() -> None:
-    process_manager = FakeProcessManager(running=True, stop_result=False)
-    process_manager.no_ui_mode = True
-    script_executor = FakeScriptExecutor(
-        results=[
-            {"success": True, "status": {"project": {"path": r"C:\repo\Demo.project"}}},
-            {"success": True, "message": "saved"},
-            {"success": True, "message": "closed"},
-        ]
-    )
-    service = ActionService(
-        process_manager=process_manager,
-        script_executor=script_executor,
-        engine_adapter=FakeEngineAdapter(),
-        logger=logging.getLogger("action-layer-test"),
-        now_fn=lambda: 999.0,
-        script_dir=Path(r"C:\repo"),
-        sleep_fn=lambda _seconds: None,
-    )
-
-    result = service.execute(
-        ActionRequest(action=ActionType.PROJECT_COMPILE, params={"clean_build": False})
-    )
-
-    assert result.status_code == 500
-    assert result.body == {
-        "success": False,
-        "error": "Failed to stop CODESYS session for noUI compile fallback",
-    }
-
-
-def test_project_compile_fallback_returns_error_when_restart_fails() -> None:
-    process_manager = FakeProcessManager(running=True, start_result=False)
-    process_manager.no_ui_mode = True
-    script_executor = FakeScriptExecutor(
-        results=[
-            {"success": True, "status": {"project": {"path": r"C:\repo\Demo.project"}}},
-            {"success": True, "message": "saved"},
-            {"success": True, "message": "closed"},
-        ]
-    )
-    service = ActionService(
-        process_manager=process_manager,
-        script_executor=script_executor,
-        engine_adapter=FakeEngineAdapter(),
-        logger=logging.getLogger("action-layer-test"),
-        now_fn=lambda: 999.0,
-        script_dir=Path(r"C:\repo"),
-        sleep_fn=lambda _seconds: None,
-    )
-
-    result = service.execute(
-        ActionRequest(action=ActionType.PROJECT_COMPILE, params={"clean_build": False})
-    )
-
-    assert result.status_code == 500
-    assert result.body == {
-        "success": False,
-        "error": "Failed to restart CODESYS in UI mode for compile",
-    }
-
-
-def test_project_compile_fallback_returns_engine_error_when_reopen_fails() -> None:
-    process_manager = FakeProcessManager(running=True)
-    process_manager.no_ui_mode = True
-    script_executor = FakeScriptExecutor(
-        results=[
-            {"success": True, "status": {"project": {"path": r"C:\repo\Demo.project"}}},
-            {"success": True, "message": "saved"},
-            {"success": True, "message": "closed"},
-            {"success": True, "message": "session started"},
-            {"success": False, "error": "open failed"},
-        ]
-    )
-    service = ActionService(
-        process_manager=process_manager,
-        script_executor=script_executor,
-        engine_adapter=FakeEngineAdapter(),
-        logger=logging.getLogger("action-layer-test"),
-        now_fn=lambda: 999.0,
-        script_dir=Path(r"C:\repo"),
-        sleep_fn=lambda _seconds: None,
-    )
-
-    result = service.execute(
-        ActionRequest(action=ActionType.PROJECT_COMPILE, params={"clean_build": False})
-    )
-
-    assert result.status_code == 500
-    assert result.body == {
-        "success": False,
-        "error": "open failed",
-        "normalized_by": "project.open",
-    }
-
-
-def test_project_compile_fallback_returns_engine_error_when_close_fails() -> None:
-    process_manager = FakeProcessManager(running=True)
-    process_manager.no_ui_mode = True
-    script_executor = FakeScriptExecutor(
-        results=[
-            {"success": True, "status": {"project": {"path": r"C:\repo\Demo.project"}}},
-            {"success": True, "message": "saved"},
-            {"success": False, "error": "close failed"},
-        ]
-    )
-    service = ActionService(
-        process_manager=process_manager,
-        script_executor=script_executor,
-        engine_adapter=FakeEngineAdapter(),
-        logger=logging.getLogger("action-layer-test"),
-        now_fn=lambda: 999.0,
-        script_dir=Path(r"C:\repo"),
-        sleep_fn=lambda _seconds: None,
-    )
-
-    result = service.execute(
-        ActionRequest(action=ActionType.PROJECT_COMPILE, params={"clean_build": False})
-    )
-
-    assert result.status_code == 500
-    assert result.body == {
-        "success": False,
-        "error": "close failed",
-        "normalized_by": "project.close",
-    }
+    assert result.body["success"] is False
+    assert result.body["error"] == "Compilation completed with errors"
+    assert result.body["message_counts"] == {"errors": 1, "warnings": 0, "infos": 0}
 
 
 def test_project_save_returns_script_result() -> None:

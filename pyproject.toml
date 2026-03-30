@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "codesys-tools"
-version = "0.2.1"
+version = "0.3.0"
 description = "Windows-first CODESYS automation tools with a local CLI and HTTP server"
 readme = "README.md"
 requires-python = ">=3.13"
@@ -75,7 +75,6 @@ files = [
     "src/codesys_api",
     "codesys_cli.py",
     "HTTP_SERVER.py",
-    "scripts/dev/test_server.py",
     "scripts/build_release.py",
     "scripts/check_public_release.py",
     "scripts/verify_installed_package.py",
@@ -90,7 +89,6 @@ files = [
 module = [
     "HTTP_SERVER",
     "PERSISTENT_SESSION",
-    "test_server",
     "codesys_api.http_server",
     "codesys_api.server_entry",
 ]

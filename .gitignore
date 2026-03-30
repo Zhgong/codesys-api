@@ -22,6 +22,7 @@ logs/
 
 # API keys and configuration
 api_keys.json
+.env.real-codesys.local
 
 # Temporary directories
 requests/
@@ -55,6 +56,8 @@ real_server_stderr.log
 manual_pytest_tmp/
 pytesttmp_abs/
 tmpc5ph5jfm/
+.codex_test_tmp/
+.codex-pytest-*/
 
 # Windows service-related
 *.exe
@@ -73,3 +76,4 @@ tmpc5ph5jfm/
 Thumbs.db
 **/.claude/settings.local.json
 GEMINI.md
+docs/scriptDoc.txt
