@@ -62,26 +62,26 @@ All five layers of the Real CODESYS Contract Ladder v1 are GREEN.
 - `http-all` (8 tests): `8 passed` in 352.37s
 - `cli-all` (2 tests): `2 passed` in 95.44s
 
-**Packaging gate** _(to be completed before publish)_
+**Packaging gate**
 
-- [ ] `python scripts\build_release.py` succeeds
-- [ ] wheel and sdist produced
-- [ ] clean wheel-install smoke passes
-- [ ] `codesys-tools` entrypoint verified
-- [ ] `codesys-tools-server` entrypoint verified
-- [ ] `PERSISTENT_SESSION.py` packaged
-- [ ] `ScriptLib/` packaged
+- [x] `python scripts\build_release.py` succeeds
+- [x] wheel and sdist produced
+- [x] clean wheel-install smoke passes
+- [x] `codesys-tools` entrypoint verified
+- [x] `codesys-tools-server` entrypoint verified
+- [x] `PERSISTENT_SESSION.py` packaged
+- [x] `ScriptLib/` packaged
 
-**TestPyPI** _(to be completed before publish)_
+**TestPyPI**
 
-- [ ] `Publish Package (target=testpypi)` passes
-- [ ] `Verify Published Package (target=testpypi, version=0.3.0)` passes
+- [x] `Publish Package (target=testpypi)` passes
+- [x] `Verify Published Package (target=testpypi, version=0.3.0)` passes
 
 **PyPI**
 
-- [ ] Published: —
-- [ ] Verified: —
-- [ ] Git tag: `v0.3.0`
+- [x] Published: https://pypi.org/project/codesys-tools/
+- [x] Verified
+- [x] Git tag: `v0.3.0`
 
 ---
 
