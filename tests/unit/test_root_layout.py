@@ -9,8 +9,10 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 def test_repo_root_keeps_only_formal_entrypoints_and_metadata() -> None:
     expected_root_files = {
         ".gitignore",
+        "AGENT.md",
         "AGENTS.md",
         "CLAUDE.md",
+        "GEMINI.md",
         "HTTP_SERVER.py",
         "LICENSE",
         "PERSISTENT_SESSION.py",
