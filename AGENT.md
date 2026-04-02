@@ -26,6 +26,26 @@ Behavior:
 - CLI JSON mode: `--json` prints raw result JSON.
 - REST mode: JSON response body for every endpoint.
 
+## Architecture & Execution Pipeline (For AI Context)
+
+### The Flow
+Every command follows a three-layer execution path:
+1.  **CLI / REST Layer** (`src/codesys_api/cli_entry.py` / `HTTP_SERVER.py`): Entry points responsible for parameter parsing, authentication, and formatting the final output.
+2.  **Action Layer** (`src/codesys_api/action_layer.py`): The core orchestrator. It handles business logic, state management, and environment validation (e.g., running `doctor` checks before critical operations).
+3.  **Engine Layer** (`PERSISTENT_SESSION.py`): The low-level executor running inside the CODESYS environment (IronPython 2.7). It performs the actual automation tasks like opening projects or compiling POUs.
+
+### IPC Communication Mechanism
+The **Action Layer** and **Engine Layer** communicate asynchronously via the file system:
+- **Requests**: The Action Layer writes a JSON request file into the `requests/` directory.
+- **Results**: The Engine Layer (polling `requests/`) processes the file and writes a corresponding JSON result file into the `results/` directory.
+- **Timeout**: The Action Layer waits for the result file with a configurable timeout.
+
+### Debugging for AI Agents
+When an operation fails, follow this diagnostic path:
+1.  **Process/Network Failure**: If the CLI cannot connect or the server won't start, run `codesys-tools doctor` or check the server logs. This usually indicates an environment or configuration issue.
+2.  **HTTP 500 / Execution Failure**: If you receive an HTTP 500 or a JSON response with `success: false`, the error likely occurred within the **Engine Layer** (inside CODESYS). Check the `error` field in the JSON response for details.
+3.  **Critical Rule**: **Never manually modify files in the `requests/` directory.** This can corrupt the IPC state. Use the CLI or REST API to interact with the system.
+
 ## CLI Command Hierarchy
 
 ```text
