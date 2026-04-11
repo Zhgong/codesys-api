@@ -421,7 +421,7 @@ class ActionService:
         pipe_name = r"\\.\pipe\codesys_api_doctor_test_{0}".format(uuid.uuid4().hex)
         handle: object | None = None
         try:
-            import win32pipe  # type: ignore[import-not-found]
+            import win32pipe  # type: ignore[import-untyped]
         except Exception as exc:
             return self._doctor_check(
                 name="Named pipe creation",
@@ -455,7 +455,7 @@ class ActionService:
                     close_method()
                 else:
                     try:
-                        import win32file  # type: ignore[import-not-found]
+                        import win32file  # type: ignore[import-untyped]
 
                         win32file.CloseHandle(handle)
                     except Exception:

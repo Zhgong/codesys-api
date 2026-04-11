@@ -5,7 +5,7 @@ import json
 from typing import cast
 
 from codesys_api.action_layer import ActionRequest, ActionResult, ActionType
-from codesys_api.cli_entry import run_cli
+from codesys_api.cli_entry import ActionServiceLike, run_cli
 
 
 class FakeActionService:
@@ -43,7 +43,7 @@ def test_cli_doctor_success_reports_all_checks_to_stdout() -> None:
     stdout = io.StringIO()
     stderr = io.StringIO()
 
-    exit_code = run_cli(["doctor"], action_service=cast(object, service), stdout=stdout, stderr=stderr)
+    exit_code = run_cli(["doctor"], action_service=cast(ActionServiceLike, service), stdout=stdout, stderr=stderr)
 
     assert exit_code == 0
     output = stdout.getvalue()
@@ -84,7 +84,7 @@ def test_cli_doctor_partial_failure_routes_failures_to_stderr_and_returns_exit_1
     stdout = io.StringIO()
     stderr = io.StringIO()
 
-    exit_code = run_cli(["doctor"], action_service=cast(object, service), stdout=stdout, stderr=stderr)
+    exit_code = run_cli(["doctor"], action_service=cast(ActionServiceLike, service), stdout=stdout, stderr=stderr)
 
     assert exit_code == 1
     assert "[PASS] Python dependency: requests" in stdout.getvalue()
@@ -109,7 +109,7 @@ def test_cli_doctor_json_mode_emits_raw_json_and_uses_fail_exit_code() -> None:
     stdout = io.StringIO()
     stderr = io.StringIO()
 
-    exit_code = run_cli(["--json", "doctor"], action_service=cast(object, service), stdout=stdout, stderr=stderr)
+    exit_code = run_cli(["--json", "doctor"], action_service=cast(ActionServiceLike, service), stdout=stdout, stderr=stderr)
 
     assert exit_code == 1
     assert json.loads(stdout.getvalue()) == body
