@@ -19,7 +19,7 @@ def test_readme_states_public_support_boundary() -> None:
 
 
 def test_public_release_docs_link_current_public_entrypoints() -> None:
-    release_doc = (REPO_ROOT / "docs" / "PUBLIC_RELEASE.md").read_text(encoding="utf-8")
+    release_doc = (REPO_ROOT / "docs" / "archive" / "PUBLIC_RELEASE.md").read_text(encoding="utf-8")
     install_doc = (REPO_ROOT / "docs" / "INSTALLATION_GUIDE.md").read_text(encoding="utf-8")
 
     assert "python scripts\\check_public_release.py" in release_doc

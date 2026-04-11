@@ -9,7 +9,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 def test_repo_root_keeps_only_formal_entrypoints_and_metadata() -> None:
     expected_root_files = {
         ".gitignore",
-        "AGENTS.md",
+        "AGENT.md",
         "CLAUDE.md",
         "HTTP_SERVER.py",
         "LICENSE",
@@ -25,6 +25,7 @@ def test_repo_root_keeps_only_formal_entrypoints_and_metadata() -> None:
     }
     allowed_local_files = {
         ".env.real-codesys.local",
+        "GEMINI.md",
     }
 
     actual_root_files = {path.name for path in REPO_ROOT.iterdir() if path.is_file()} - allowed_local_files

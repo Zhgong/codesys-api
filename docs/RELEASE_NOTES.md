@@ -2,7 +2,51 @@
 
 ## Unreleased
 
-_(nothing queued)_
+### 0.5.0 — planned
+
+**视觉营销**
+
+- VHS 录制核心操作流程 GIF（`session start` → `pou create` → `project compile`），嵌入 README 顶部 Demo 区域。
+
+---
+
+## 0.4.0 — unreleased
+
+### Summary
+
+DX 增强版本（代号 Visibility & Readiness）。核心目标：降低新用户上手门槛，提升工具在 AI Agent 环境中的识别率。无核心功能变更。
+
+### Changes
+
+**新功能**
+
+- 新增 `codesys-tools doctor` 命令：一键诊断本地环境，涵盖 CODESYS 路径、Profile、pywin32 依赖、命名管道权限、HTTP 服务状态五项检查。每个 `FAIL` 项附带具体修复建议，exit code 语义化（0=全通过，1=有 FAIL）。支持 `--json` 机器可读输出。
+
+**文档**
+
+- 新增根目录 `AGENT.md`：面向 LLM 的工具操作手册，包含 CLI 层级结构、REST 端点映射、错误处理策略及 AI 提示词速查表。
+- 新增 `examples/` 目录，包含 3 个可直接执行的 AI 自动化示例脚本：
+  - `ai_robust_startup.py` — 诊断先行的健壮启动流程
+  - `ai_create_multiple_pous.py` — 批量创建 POU
+  - `ai_compile_and_report.py` — 编译结果提取与 CI/CD 失败拦截
+
+### Verification
+
+**Unit and static gate**
+
+- [ ] `python scripts\run_baseline.py` passes
+
+**Packaging gate**
+
+- [ ] `python scripts\build_release.py` succeeds
+- [ ] wheel and sdist produced
+- [ ] clean wheel-install smoke passes
+- [ ] `codesys-tools doctor` entrypoint verified
+
+**PyPI**
+
+- [ ] Published: —
+- [ ] Git tag: `v0.4.0`
 
 ---
 
@@ -62,26 +106,26 @@ All five layers of the Real CODESYS Contract Ladder v1 are GREEN.
 - `http-all` (8 tests): `8 passed` in 352.37s
 - `cli-all` (2 tests): `2 passed` in 95.44s
 
-**Packaging gate** _(to be completed before publish)_
+**Packaging gate**
 
-- [ ] `python scripts\build_release.py` succeeds
-- [ ] wheel and sdist produced
-- [ ] clean wheel-install smoke passes
-- [ ] `codesys-tools` entrypoint verified
-- [ ] `codesys-tools-server` entrypoint verified
-- [ ] `PERSISTENT_SESSION.py` packaged
-- [ ] `ScriptLib/` packaged
+- [x] `python scripts\build_release.py` succeeds
+- [x] wheel and sdist produced
+- [x] clean wheel-install smoke passes
+- [x] `codesys-tools` entrypoint verified
+- [x] `codesys-tools-server` entrypoint verified
+- [x] `PERSISTENT_SESSION.py` packaged
+- [x] `ScriptLib/` packaged
 
-**TestPyPI** _(to be completed before publish)_
+**TestPyPI**
 
-- [ ] `Publish Package (target=testpypi)` passes
-- [ ] `Verify Published Package (target=testpypi, version=0.3.0)` passes
+- [x] `Publish Package (target=testpypi)` passes
+- [x] `Verify Published Package (target=testpypi, version=0.3.0)` passes
 
 **PyPI**
 
-- [ ] Published: —
-- [ ] Verified: —
-- [ ] Git tag: `v0.3.0`
+- [x] Published: https://pypi.org/project/codesys-tools/
+- [x] Verified
+- [x] Git tag: `v0.3.0`
 
 ---
 
