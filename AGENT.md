@@ -171,3 +171,39 @@ Use prompts with explicit action, inputs, and output mode:
 - "Start a session, create `C:\\work\\demo.project`, compile with clean build, return JSON outputs."
 - "List POUs under `Application`, then update `Application/PLC_PRG` implementation from this snippet."
 - "When REST call fails, report: endpoint, status code, success flag, error field, and next retry action."
+
+## LLM Wiki Gardener Schema (AI-Maintained Knowledge)
+
+### Core Philosophy
+The `docs/` folder is divided into `raw/` (immutable sources) and `wiki/` (AI-maintained structured knowledge). The AI agent acts as the "gardener," ensuring the wiki remains synchronized, accurate, and high-density.
+
+### Structure
+- `docs/raw/`: Place new transcripts, meeting notes, or raw technical documents here.
+- `docs/wiki/index.md`: The high-level map. Every wiki page must be linked here.
+- `docs/wiki/log.md`: Chronological log of all wiki maintenance (ingest, query, lint).
+- `docs/wiki/*.md`: Entity/Concept pages (e.g., `Architecture.md`, `Troubleshooting.md`).
+
+### Gardener Workflows
+
+#### 1. Ingest (New Information)
+When a new file is added to `docs/raw/` or new context is discovered:
+1. **Read**: Analyze the raw content.
+2. **Synthesize**: Update existing entity pages in `docs/wiki/` or create a new one.
+3. **Index**: Ensure `docs/wiki/index.md` reflects any new pages or major sections.
+4. **Log**: Append an entry to `docs/wiki/log.md` with: `[YYYY-MM-DD] INGEST: <source_file> -> <target_wiki_pages>`.
+
+#### 2. Query (Answering Questions)
+When asked a technical question about the project:
+1. **Locate**: Check `docs/wiki/index.md` to find the relevant entity pages.
+2. **Synthesize**: Formulate the answer using the wiki context.
+3. **Self-Correct**: If the answer isn't in the wiki but is found in the codebase, **file it back into the wiki** immediately.
+4. **Log**: (Optional for complex queries) `[YYYY-MM-DD] QUERY: <question_summary> -> <resolution_status>`.
+
+#### 3. Lint (Maintenance)
+Periodically or when contradictions are found:
+1. **Identify**: Find stale information or broken links between wiki pages.
+2. **Resolve**: Update the wiki to reflect the current state of the codebase.
+3. **Log**: `[YYYY-MM-DD] LINT: Fixed <contradiction/link> in <page>`.
+
+### Constraint: Atomic Updates
+Always keep wiki pages dense and context-rich. Avoid "chatty" summaries; focus on technical facts, architectural diagrams (Mermaid), and precise command references.
