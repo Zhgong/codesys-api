@@ -506,12 +506,20 @@ except Exception:
         name = str(params.get("name", ""))
         pou_type = str(params.get("type", "Program"))
         language = str(params.get("language", "ST"))
+        implements = params.get("implements", [])
+        
+        implements_str = ""
+        if isinstance(implements, list) and implements:
+            implements_str = ", ".join(str(i) for i in implements)
+        elif isinstance(implements, str) and implements.strip():
+            implements_str = implements
 
         return """
 import scriptengine
 import json
 import sys
 import traceback
+import time
 
 try:
     print("Starting POU creation script")
@@ -534,6 +542,8 @@ try:
             "CFC": scriptengine.ImplementationLanguages.cfc
         }}
         language_guid = language_map.get("{2}".upper(), scriptengine.ImplementationLanguages.st)
+        
+        # 1. Create the POU
         if hasattr(app, 'pou_container'):
             created_pou = app.pou_container.create_pou(
                 name="{0}",
@@ -546,6 +556,22 @@ try:
                 type=pou_type_map["{1}"],
                 language=language_guid
             )
+        
+        # Wait a bit for CODESYS to stabilize the object
+        time.sleep(0.5)
+
+        # 2. Apply IMPLEMENTS if specified
+        target_implements = "{3}"
+        if target_implements and hasattr(created_pou, 'textual_declaration'):
+            # Construct a proper declaration with IMPLEMENTS
+            decl_header = "{1}".upper().replace("FUNCTIONBLOCK", "FUNCTION_BLOCK")
+            new_decl = decl_header + " {0} IMPLEMENTS " + target_implements + "\\nVAR\\nEND_VAR"
+            try:
+                # Some CODESYS versions prefer replace, some set_text
+                created_pou.textual_declaration.replace(new_decl)
+            except:
+                pass
+
         if not hasattr(session, 'created_pous'):
             session.created_pous = {{}}
         session.created_pous["{0}"] = created_pou
@@ -562,7 +588,7 @@ except Exception:
     print("Error in POU creation script: " + str(error_value))
     print(traceback.format_exc())
     result = {{"success": False, "error": str(error_value)}}
-""".format(name, pou_type, language)
+""".format(name, pou_type, language, implements_str)
 
     def _generate_pou_code_script(self, params: dict[str, object]) -> str:
         path = str(params.get("path", ""))
@@ -575,6 +601,7 @@ import scriptengine
 import json
 import sys
 import traceback
+import time
 
 try:
     print("Starting POU code setting script for {0}")
@@ -584,42 +611,56 @@ try:
         project = session.active_project
         target = None
         raw_path = "{0}"
-        normalized_path = raw_path.replace("\\\\", "/")
-        target_name = normalized_path.split("/")[-1]
-        if hasattr(session, 'created_pous'):
+        target_name = raw_path.split("/")[-1].split(".")[-1]
+        
+        # 1. Resolve target
+        if hasattr(session, \'created_pous\'):
             target = session.created_pous.get(target_name)
         if target is None:
-            search_terms = [raw_path]
-            if normalized_path != raw_path:
-                search_terms.append(normalized_path)
-            if target_name not in search_terms:
-                search_terms.append(target_name)
-            for search_term in search_terms:
-                search_result = project.find(search_term)
-                if search_result is None:
-                    continue
-                if hasattr(search_result, 'textual_declaration') or hasattr(search_result, 'set_implementation_code'):
-                    target = search_result
-                    break
-                if hasattr(search_result, '__iter__'):
-                    for candidate in search_result:
-                        if hasattr(candidate, 'textual_declaration') or hasattr(candidate, 'set_implementation_code'):
-                            target = candidate
-                            break
-                if target is not None:
-                    break
+            # Try finding in the project
+            found = project.find(raw_path)
+            if found:
+                target = found[0] if hasattr(found, \'__iter__\') else found
+        
         if target is None:
             result = {{"success": False, "error": "POU not found: {0}"}}
         else:
-            if "{1}":
-                target.textual_declaration.replace(new_text="{1}")
-            if "{2}":
-                target.textual_implementation.replace(new_text="{2}")
-            if "{3}" and not "{1}" and not "{2}":
-                if hasattr(target, 'set_implementation_code'):
-                    target.set_implementation_code("{3}")
+            # 2. Process Method extraction and creation
+            full_code = "{3}"
+            if "METHOD" in full_code and hasattr(target, "create_method"):
+                # Simple extraction of METHOD name from ST: METHOD <Name> : <Type>
+                import re
+                method_matches = re.findall(r"METHOD\s+(\w+)", full_code, re.IGNORECASE)
+                for m_name in method_matches:
+                    try:
+                        # Create method object if it doesn't exist
+                        target.create_method(m_name, scriptengine.ImplementationLanguages.st)
+                        print("Created child method object: " + m_name)
+                    except:
+                        pass # Might already exist
+
+            # 3. Apply declaration and implementation
+            decl_to_set = "{1}"
+            impl_to_set = "{2}"
+            
+            # If full code is provided, try to split it into Decl and Body
+            if full_code and not decl_to_set and not impl_to_set:
+                parts = full_code.split("END_VAR", 1)
+                if len(parts) == 2:
+                    decl_to_set = parts[0] + "END_VAR"
+                    impl_to_set = parts[1].strip()
+                    # Strip closing tags if needed
+                    impl_to_set = impl_to_set.replace("END_FUNCTION_BLOCK", "").replace("END_PROGRAM", "").strip()
                 else:
-                    target.textual_implementation.replace(new_text="{3}")
+                    impl_to_set = full_code
+
+            if decl_to_set and hasattr(target, "textual_declaration"):
+                target.textual_declaration.replace(decl_to_set)
+            if impl_to_set and hasattr(target, "textual_implementation"):
+                # If impl contains methods, this might still fail if not using create_method
+                # But at least we try to set the body
+                target.textual_implementation.replace(impl_to_set)
+                
             result = {{"success": True, "message": "POU code updated successfully"}}
 except Exception:
     error_type, error_value, error_traceback = sys.exc_info()
