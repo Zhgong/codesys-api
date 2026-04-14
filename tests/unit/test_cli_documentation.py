@@ -44,7 +44,7 @@ def test_cli_usage_examples_match_parser() -> None:
         ],
     ]
 
-    usage = (REPO_ROOT / "docs" / "CLI_USAGE.md").read_text(encoding="utf-8")
+    usage = (REPO_ROOT / "docs" / "raw" / "CLI_USAGE.md").read_text(encoding="utf-8")
 
     for args in examples:
         package_command = "codesys-tools " + " ".join(args)

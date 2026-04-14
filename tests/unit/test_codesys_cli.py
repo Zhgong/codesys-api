@@ -492,7 +492,7 @@ def test_cli_logging_fallback_uses_null_handler_without_stderr_leak(monkeypatch:
 
 
 def test_cli_pou_code_reads_file_inputs(repo_root_path: Path) -> None:
-    declaration = repo_root_path / "docs" / "BASELINE.md"
+    declaration = repo_root_path / "docs" / "raw" / "BASELINE.md"
     implementation = repo_root_path / "README.md"
     service = FakeActionService(ActionResult(body={"success": True, "message": "POU code updated successfully"}))
 

@@ -614,11 +614,15 @@ try:
         project = session.active_project
         target = None
         raw_path = "{0}"
-        target_name = raw_path.split("/")[-1].split(".")[-1]
-        
+        normalized_path = raw_path.replace("\\\\", "/")
+        target_name = normalized_path.split("/")[-1].split(".")[-1]
+        search_terms = [raw_path]
+
         # 1. Resolve target
         if hasattr(session, \'created_pous\'):
             target = session.created_pous.get(target_name)
+        if target_name not in search_terms:
+            target = None
         if target is None:
             # Try finding in the project
             found = project.find(raw_path)
@@ -658,11 +662,9 @@ try:
                     impl_to_set = full_code
 
             if decl_to_set and hasattr(target, "textual_declaration"):
-                target.textual_declaration.replace(decl_to_set)
+                target.textual_declaration.replace(new_text=decl_to_set)
             if impl_to_set and hasattr(target, "textual_implementation"):
-                # If impl contains methods, this might still fail if not using create_method
-                # But at least we try to set the body
-                target.textual_implementation.replace(impl_to_set)
+                target.textual_implementation.replace(new_text=impl_to_set)
                 
             result = {{"success": True, "message": "POU code updated successfully"}}
 except Exception:
