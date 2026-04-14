@@ -88,6 +88,7 @@ class FakeEngineAdapter:
             project_close=True,
             project_list=True,
             project_compile=True,
+            project_import_xml=True,
             pou_create=True,
             pou_code=True,
             pou_list=True,
@@ -120,6 +121,8 @@ class FakeEngineAdapter:
             return ExecutionSpec(script=f"pou-code:{params['path']}", timeout=30)
         if action == "pou.list":
             return ExecutionSpec(script=f"pou-list:{params.get('parentPath', '')}", timeout=30)
+        if action == "project.import_xml":
+            return ExecutionSpec(script=f"project-import-xml:{params.get('xml_path', '')}", timeout=60)
         raise ValueError(f"Unsupported action: {action}")
 
     def normalize_result(self, action: str, raw_result: dict[str, object]) -> dict[str, object]:
@@ -355,6 +358,7 @@ def test_project_compile_returns_unsupported_when_engine_lacks_capability() -> N
             project_close=True,
             project_list=True,
             project_compile=False,
+            project_import_xml=True,
             pou_create=True,
             pou_code=True,
             pou_list=True,
@@ -511,3 +515,85 @@ def test_pou_list_returns_script_result() -> None:
         "pous": [{"name": "PLC_PRG"}],
         "normalized_by": "pou.list",
     }
+
+
+def test_project_import_xml_validates_xml_path_required() -> None:
+    service = make_service(
+        running=True,
+        script_result={"success": True},
+    )
+
+    result = service.execute(
+        ActionRequest(action=ActionType.PROJECT_IMPORT_XML, params={})
+    )
+
+    assert result.status_code == 400
+    assert result.body["success"] is False
+    assert "xml_path" in str(result.body.get("error", ""))
+
+
+def test_project_import_xml_returns_unsupported_when_capability_false() -> None:
+    service = make_service(
+        running=True,
+        capabilities=EngineCapabilities(
+            session_start=True,
+            session_status=True,
+            script_execute=True,
+            project_create=True,
+            project_open=True,
+            project_save=True,
+            project_close=True,
+            project_list=True,
+            project_compile=True,
+            project_import_xml=False,
+            pou_create=True,
+            pou_code=True,
+            pou_list=True,
+        ),
+        script_result={"success": True},
+    )
+
+    result = service.execute(
+        ActionRequest(action=ActionType.PROJECT_IMPORT_XML, params={"xml_path": "test.xml"})
+    )
+
+    assert result.status_code == 501
+    assert result.body == {
+        "success": False,
+        "error": "Action not supported by engine: project.import_xml",
+        "engine": "fake-engine",
+    }
+
+
+def test_project_import_xml_success_returns_200() -> None:
+    service = make_service(
+        running=True,
+        script_result={"success": True, "warnings": [], "errors": []},
+    )
+
+    result = service.execute(
+        ActionRequest(
+            action=ActionType.PROJECT_IMPORT_XML,
+            params={"xml_path": "C:\\test\\MyPOU.xml"},
+        )
+    )
+
+    assert result.status_code == 200
+    assert result.body["success"] is True
+
+
+def test_project_import_xml_engine_failure_returns_500() -> None:
+    service = make_service(
+        running=True,
+        script_result={"success": False, "error": "import failed", "warnings": [], "errors": ["bad xml"]},
+    )
+
+    result = service.execute(
+        ActionRequest(
+            action=ActionType.PROJECT_IMPORT_XML,
+            params={"xml_path": "C:\\test\\Bad.xml"},
+        )
+    )
+
+    assert result.status_code == 500
+    assert result.body["success"] is False

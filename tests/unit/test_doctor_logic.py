@@ -54,6 +54,7 @@ class UnusedEngineAdapter:
             project_close=False,
             project_list=False,
             project_compile=False,
+            project_import_xml=False,
             pou_create=False,
             pou_code=False,
             pou_list=False,

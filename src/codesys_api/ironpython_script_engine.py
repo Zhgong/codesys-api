@@ -31,6 +31,7 @@ class IronPythonScriptEngineAdapter:
             project_close=True,
             project_list=True,
             project_compile=True,
+            project_import_xml=True,
             pou_create=True,
             pou_code=True,
             pou_list=True,
@@ -58,6 +59,8 @@ class IronPythonScriptEngineAdapter:
             return ExecutionSpec(script=self._generate_project_list_script(), timeout=30)
         if action == "project.compile":
             return ExecutionSpec(script=self._generate_project_compile_script(params), timeout=300)
+        if action == "project.import_xml":
+            return ExecutionSpec(script=self._generate_project_import_xml_script(params), timeout=60)
         if action == "pou.create":
             return ExecutionSpec(script=self._generate_pou_create_script(params), timeout=30)
         if action == "pou.code":
@@ -958,3 +961,34 @@ except Exception:
         "message_counts": {{"errors": 1, "warnings": 0, "infos": 0}}
     }}
 """.format("True" if clean_build else "False", "True" if safe_message_harvest else "False")
+
+    def _generate_project_import_xml_script(self, params: dict[str, object]) -> str:
+        xml_path = str(params.get("xml_path", ""))
+        import_fragment = proven_primitives.build_import_xml_fragment(xml_path)
+        return """\
+import json
+import sys
+
+try:
+    project = session.active_project
+    if project is None:
+        result = {{"success": False, "error": "No active project", "warnings": [], "errors": []}}
+    else:
+        class _Reporter(object):
+            def __init__(self): self.errors = []; self.warnings = []
+            def error(self, m): self.errors.append(str(m))
+            def warning(self, m): self.warnings.append(str(m))
+            def resolve_conflict(self, o): return scriptengine.ConflictResolve.Skip
+            def added(self, o): pass
+            def replaced(self, o): pass
+            def skipped(self, n): pass
+        reporter = _Reporter()
+        {import_fragment}
+        result = {{
+            "success": len(reporter.errors) == 0,
+            "warnings": reporter.warnings,
+            "errors": reporter.errors,
+        }}
+except Exception as _e:
+    result = {{"success": False, "error": str(_e), "warnings": [], "errors": []}}
+""".format(import_fragment=import_fragment)

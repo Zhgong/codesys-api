@@ -17,6 +17,7 @@ real_project_skeleton_probe  step 4     build_create_pou_fragment
 real_project_skeleton_probe  step 5     build_create_task_configuration_fragment
 real_project_skeleton_probe  step 6     build_create_main_task_fragment
 real_project_skeleton_probe  step 7     build_assign_pou_to_task_fragment
+real_project_import_xml_probe             build_import_xml_fragment
 """
 
 from __future__ import annotations
@@ -130,3 +131,16 @@ def build_assign_pou_to_task_fragment(pou_name: str) -> str:
     Assumes ``existing_task`` (local variable) is set.
     """
     return 'existing_task.pous.add("{0}")'.format(_escape(pou_name))
+
+
+def build_import_xml_fragment(xml_path: str) -> str:
+    """
+    IronPython line: import a PLCopen XML file into the active project.
+
+    Proven fact: ``project.import_xml(path, reporter)`` succeeds when called
+    on ``session.active_project`` with a valid PLCopen XML file path.  Returns
+    ``None``; success/failure is signalled via the reporter callbacks.
+
+    Assumes ``project`` and ``reporter`` (local variables) are already set.
+    """
+    return 'project.import_xml("{0}", reporter)'.format(_escape(xml_path))

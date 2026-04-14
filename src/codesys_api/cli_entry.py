@@ -180,6 +180,18 @@ def build_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     project_compile.add_argument("--clean-build", action="store_true", default=False)
+    project_import_xml = project_subparsers.add_parser(
+        "import-xml", help="Import a PLCopen XML file into the active project"
+    )
+    project_import_xml.add_argument(
+        "--xml-path", required=True, help="Path to PLCopen XML file"
+    )
+    project_import_xml.add_argument(
+        "--import-folder-structure",
+        action="store_true",
+        default=False,
+        help="Also import folder structure (CODESYS proprietary extension)",
+    )
 
     pou_parser = subparsers.add_parser(
         "pou",
@@ -268,6 +280,14 @@ def _build_action_request(args: argparse.Namespace) -> ActionRequest:
             return ActionRequest(action=ActionType.PROJECT_CLOSE, params={})
         if args.operation == "list":
             return ActionRequest(action=ActionType.PROJECT_LIST, params={})
+        if args.operation == "import-xml":
+            return ActionRequest(
+                action=ActionType.PROJECT_IMPORT_XML,
+                params={
+                    "xml_path": args.xml_path,
+                    "import_folder_structure": args.import_folder_structure,
+                },
+            )
         return ActionRequest(
             action=ActionType.PROJECT_COMPILE,
             params={"clean_build": bool(args.clean_build)},
@@ -339,6 +359,22 @@ def _format_human_result(action: ActionType, body: Mapping[str, object]) -> str:
                         project_lines.append(name)
             return "\n".join(project_lines) if project_lines else "No recent projects"
         return "Project list unavailable"
+
+    if action == ActionType.PROJECT_IMPORT_XML:
+        if success:
+            warnings = body.get("warnings", [])
+            if isinstance(warnings, list) and warnings:
+                return "Import succeeded with {0} warning(s):\n{1}".format(
+                    len(warnings),
+                    "\n".join("  " + w for w in warnings if isinstance(w, str)),
+                )
+            return "Import succeeded."
+        errors = body.get("errors")
+        if isinstance(errors, list) and errors:
+            return "Import failed:\n" + "\n".join(
+                "  " + e for e in errors if isinstance(e, str)
+            )
+        return "Import failed: {0}".format(body.get("error", "unknown error"))
 
     if action == ActionType.POU_LIST:
         pous = body.get("pous")

@@ -62,6 +62,7 @@ class ActionType(str, Enum):
     PROJECT_CLOSE = "project.close"
     PROJECT_LIST = "project.list"
     PROJECT_COMPILE = "project.compile"
+    PROJECT_IMPORT_XML = "project.import_xml"
     POU_CREATE = "pou.create"
     POU_CODE = "pou.code"
     POU_LIST = "pou.list"
@@ -129,6 +130,8 @@ class ActionService:
             return self._project_list(request)
         if request.action == ActionType.PROJECT_COMPILE:
             return self._project_compile(request)
+        if request.action == ActionType.PROJECT_IMPORT_XML:
+            return self._project_import_xml(request)
         if request.action == ActionType.POU_CREATE:
             return self._pou_create(request)
         if request.action == ActionType.POU_CODE:
@@ -705,6 +708,26 @@ class ActionService:
         result = self._execute_engine_action(
             action=request.action,
             params=self._build_compile_params(request.params, safe_message_harvest=False),
+            timeout_override=request.timeout,
+        )
+        status_code = 200 if result.get("success", False) else 500
+        return ActionResult(body=result, status_code=status_code, request_id=request.request_id)
+
+    def _project_import_xml(self, request: ActionRequest) -> ActionResult:
+        if not self.engine_adapter.capabilities().project_import_xml:
+            return self._unsupported_action(request.action, request.request_id)
+
+        error = validate_required_params(request.params, ["xml_path"])
+        if error is not None:
+            return ActionResult(
+                body={"success": False, "error": error},
+                status_code=400,
+                request_id=request.request_id,
+            )
+
+        result = self._execute_engine_action(
+            action=request.action,
+            params=request.params,
             timeout_override=request.timeout,
         )
         status_code = 200 if result.get("success", False) else 500

@@ -15,6 +15,7 @@ class EngineCapabilities:
     project_close: bool
     project_list: bool
     project_compile: bool
+    project_import_xml: bool
     pou_create: bool
     pou_code: bool
     pou_list: bool
