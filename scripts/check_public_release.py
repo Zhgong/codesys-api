@@ -10,8 +10,8 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 WHEEL_SMOKE_ENV = REPO_ROOT / "build" / "public_release_smoke"
 README_PATH = REPO_ROOT / "README.md"
-PUBLIC_RELEASE_DOC = REPO_ROOT / "docs" / "PUBLIC_RELEASE.md"
-INSTALLATION_GUIDE = REPO_ROOT / "docs" / "INSTALLATION_GUIDE.md"
+PUBLIC_RELEASE_DOC = REPO_ROOT / "docs" / "archive" / "PUBLIC_RELEASE.md"
+INSTALLATION_GUIDE = REPO_ROOT / "docs" / "raw" / "INSTALLATION_GUIDE.md"
 PYPROJECT_PATH = REPO_ROOT / "pyproject.toml"
 
 

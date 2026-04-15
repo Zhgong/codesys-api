@@ -17,12 +17,15 @@ Every request flows through a three-layer decoupled architecture:
    - Interacts directly with the `scriptengine` COM API.
    - Polls for requests and executes them within the IDE's main thread context.
 
-## IPC Mechanism (File-Based)
-Communication between Host (Python 3) and Guest (IronPython 2.7) is asynchronous and file-based to ensure compatibility across runtime boundaries:
+## IPC Mechanism (Named Pipe)
+Communication between Host (Python 3) and Guest (IronPython 2.7) uses a Windows named pipe:
 
-- **Requests**: Host writes JSON files to `requests/`.
-- **Results**: Guest processes requests and writes JSON results to `results/`.
-- **Synchronization**: The Host waits for result files with a configurable timeout.
+- **Transport**: `named_pipe_transport.py` writes the script over a named pipe via `kernel32` ctypes.
+- **Execution**: `PERSISTENT_SESSION.py` polls the pipe, executes the received IronPython snippet via `scriptengine`, and writes a JSON result back.
+- **Synchronization**: `script_executor.py` waits for the result with a configurable timeout.
+- **Pipe name**: defaults to `codesys_api_session`, overridable via `CODESYS_API_PIPE_NAME`.
+
+The file-based transport (`requests/` / `results/` directories) was retired and is no longer supported.
 
 ## Boundary Contract (The Golden Rule)
 To maintain stability, the system follows a strict "Boundary Contract":

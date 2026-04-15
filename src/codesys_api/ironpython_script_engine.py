@@ -32,6 +32,8 @@ class IronPythonScriptEngineAdapter:
             project_list=True,
             project_compile=True,
             project_import_xml=True,
+            project_import_xml_content=True,
+            project_import_xml_b64=True,
             pou_create=True,
             pou_code=True,
             pou_list=True,
@@ -59,7 +61,7 @@ class IronPythonScriptEngineAdapter:
             return ExecutionSpec(script=self._generate_project_list_script(), timeout=30)
         if action == "project.compile":
             return ExecutionSpec(script=self._generate_project_compile_script(params), timeout=300)
-        if action == "project.import_xml":
+        if action in ("project.import_xml", "project.import_xml_content", "project.import_xml_b64"):
             return ExecutionSpec(script=self._generate_project_import_xml_script(params), timeout=60)
         if action == "pou.create":
             return ExecutionSpec(script=self._generate_pou_create_script(params), timeout=30)

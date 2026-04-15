@@ -15,5 +15,5 @@ Welcome to the AI-maintained wiki for the Codesys-API project.
 - `/docs/wiki`: This structured knowledge base.
 
 ## Maintenance
-- Last Gardener Sync: 2026-04-13
+- Last Gardener Sync: 2026-04-15
 - [[log|View Maintenance Log]]

@@ -63,6 +63,8 @@ class ActionType(str, Enum):
     PROJECT_LIST = "project.list"
     PROJECT_COMPILE = "project.compile"
     PROJECT_IMPORT_XML = "project.import_xml"
+    PROJECT_IMPORT_XML_CONTENT = "project.import_xml_content"
+    PROJECT_IMPORT_XML_B64 = "project.import_xml_b64"
     POU_CREATE = "pou.create"
     POU_CODE = "pou.code"
     POU_LIST = "pou.list"
@@ -81,6 +83,26 @@ class ActionResult:
     body: dict[str, object]
     status_code: int = 200
     request_id: str | None = field(default=None, repr=False)
+
+
+def _write_temp_xml(data: bytes) -> str:
+    """Write *data* to a new temp .xml file under C:\\tmp and return its path."""
+    import tempfile
+    os.makedirs(r"C:\tmp", exist_ok=True)
+    fd, path = tempfile.mkstemp(suffix=".xml", dir=r"C:\tmp")
+    try:
+        os.write(fd, data)
+    finally:
+        os.close(fd)
+    return path
+
+
+def _remove_temp(path: str) -> None:
+    """Delete a temp file, ignoring errors if it is already gone."""
+    try:
+        os.unlink(path)
+    except OSError:
+        pass
 
 
 class ActionService:
@@ -132,6 +154,10 @@ class ActionService:
             return self._project_compile(request)
         if request.action == ActionType.PROJECT_IMPORT_XML:
             return self._project_import_xml(request)
+        if request.action == ActionType.PROJECT_IMPORT_XML_CONTENT:
+            return self._project_import_xml_content(request)
+        if request.action == ActionType.PROJECT_IMPORT_XML_B64:
+            return self._project_import_xml_b64(request)
         if request.action == ActionType.POU_CREATE:
             return self._pou_create(request)
         if request.action == ActionType.POU_CODE:
@@ -732,6 +758,65 @@ class ActionService:
         )
         status_code = 200 if result.get("success", False) else 500
         return ActionResult(body=result, status_code=status_code, request_id=request.request_id)
+
+    def _project_import_xml_content(self, request: ActionRequest) -> ActionResult:
+        if not self.engine_adapter.capabilities().project_import_xml_content:
+            return self._unsupported_action(request.action, request.request_id)
+
+        error = validate_required_params(request.params, ["xml_content"])
+        if error is not None:
+            return ActionResult(
+                body={"success": False, "error": error},
+                status_code=400,
+                request_id=request.request_id,
+            )
+
+        xml_content = str(request.params["xml_content"])
+        tmp_path = _write_temp_xml(xml_content.encode("utf-8"))
+        try:
+            delegated = ActionRequest(
+                action=ActionType.PROJECT_IMPORT_XML,
+                params={**request.params, "xml_path": tmp_path},
+                timeout=request.timeout,
+                request_id=request.request_id,
+            )
+            return self._project_import_xml(delegated)
+        finally:
+            _remove_temp(tmp_path)
+
+    def _project_import_xml_b64(self, request: ActionRequest) -> ActionResult:
+        if not self.engine_adapter.capabilities().project_import_xml_b64:
+            return self._unsupported_action(request.action, request.request_id)
+
+        error = validate_required_params(request.params, ["xml_b64"])
+        if error is not None:
+            return ActionResult(
+                body={"success": False, "error": error},
+                status_code=400,
+                request_id=request.request_id,
+            )
+
+        import base64
+        try:
+            raw = base64.b64decode(str(request.params["xml_b64"]))
+        except Exception as exc:
+            return ActionResult(
+                body={"success": False, "error": f"Invalid base64: {exc}"},
+                status_code=400,
+                request_id=request.request_id,
+            )
+
+        tmp_path = _write_temp_xml(raw)
+        try:
+            delegated = ActionRequest(
+                action=ActionType.PROJECT_IMPORT_XML,
+                params={**request.params, "xml_path": tmp_path},
+                timeout=request.timeout,
+                request_id=request.request_id,
+            )
+            return self._project_import_xml(delegated)
+        finally:
+            _remove_temp(tmp_path)
 
     def _build_compile_params(
         self,

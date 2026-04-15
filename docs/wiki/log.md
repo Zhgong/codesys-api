@@ -1,5 +1,13 @@
 # Maintenance Log
 
+## 2026-04-15
+- **FIX**: Updated `scripts/check_public_release.py` to reflect docs restructure — `PUBLIC_RELEASE_DOC` now points to `docs/archive/PUBLIC_RELEASE.md`, `INSTALLATION_GUIDE` to `docs/raw/INSTALLATION_GUIDE.md`.
+- **UPDATE**: Expanded REST API reference table in [[Operations]] from 6 to 18 endpoints, grouped by Session / Project / POU / Script / System, with body params and descriptions.
+- **FIX**: Corrected IPC mechanism description in [[Architecture]] from file-based to named pipe (file transport was retired).
+- **FEAT**: Added MCP server — `src/codesys_api/mcp_server.py`, `MCP_SERVER.py`, `codesys-tools-mcp` entry point, `mcp` dependency. TDD: 19 unit tests in `tests/unit/test_mcp_server.py`. Updated [[Operations]] with MCP server section.
+- **FEAT**: MCP server defaults to SSE transport (`0.0.0.0:8001`) for cross-machine access. Configurable via `CODESYS_API_MCP_TRANSPORT/HOST/PORT`. Added `start-mcp.ps1`. Updated [[Operations]] with remote/local config examples and env var table.
+- **FIX**: Updated `tests/unit/test_root_layout.py` to filter gitignored files; updated `.gitignore` with probe/test-result/screenshot patterns.
+
 ## 2026-04-13
 - **INGEST**: Bootstrapped LLM Wiki architecture.
 - **INGEST**: Migrated 23 legacy documents to `docs/raw/`.

@@ -24,6 +24,51 @@ python scripts\build_release.py
 pip install dist\codesys_tools-*.whl
 ```
 
+## MCP Server
+
+For AI-native workflows (Claude Code, Claude Desktop, Cursor), use the MCP server instead of HTTP:
+
+```powershell
+# Repo-local (dev)
+python MCP_SERVER.py
+
+# After pip install
+codesys-tools-mcp
+```
+
+**Remote access** (Claude Code on another machine):
+```json
+{
+  "mcpServers": {
+    "codesys": {
+      "url": "http://<this-machine-IP>:8001/sse"
+    }
+  }
+}
+```
+
+**Local access** (Claude Desktop on the same machine):
+```json
+{
+  "mcpServers": {
+    "codesys": {
+      "command": "powershell",
+      "args": ["-File", "C:\\path\\to\\codesys-api\\start-mcp.ps1"]
+    }
+  }
+}
+```
+
+The MCP server exposes all 15 CODESYS operations as native tools. No `Authorization` header needed — MCP transport handles security.
+
+**MCP environment variables** (set in `.env.real-codesys.local`):
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `CODESYS_API_MCP_TRANSPORT` | `sse` | `sse` for network access, `stdio` for local Claude Desktop |
+| `CODESYS_API_MCP_HOST` | `0.0.0.0` | Bind address |
+| `CODESYS_API_MCP_PORT` | `8001` | SSE port |
+
 ## CLI Reference
 The CLI provides a convenient way to execute single actions or manage the server.
 
@@ -44,14 +89,47 @@ The CLI provides a convenient way to execute single actions or manage the server
 ## REST API Reference
 The HTTP server defaults to port `8080`. All requests require `Authorization: ApiKey <token>`.
 
-| Method | Path | Description |
-| --- | --- | --- |
-| POST | `/api/v1/session/start` | Launch CODESYS and start IPC session. |
-| GET | `/api/v1/session/status` | Check if CODESYS and IPC are alive. |
-| POST | `/api/v1/project/create` | Create and open a new project. |
-| POST | `/api/v1/project/compile` | Trigger a build and return message counts. |
-| POST | `/api/v1/pou/code` | Update POU declaration and implementation. |
-| POST | `/api/v1/script/execute` | Execute arbitrary IronPython code in CODESYS. |
+### Session
+
+| Method | Path | Body params | Description |
+| --- | --- | --- | --- |
+| POST | `/api/v1/session/start` | — | Launch CODESYS process and open IPC session. |
+| POST | `/api/v1/session/stop` | — | Stop the CODESYS process and close the session. |
+| POST | `/api/v1/session/restart` | — | Stop then restart the CODESYS process. |
+| GET  | `/api/v1/session/status` | — | Return process and IPC liveness state. |
+
+### Project
+
+| Method | Path | Body params | Description |
+| --- | --- | --- | --- |
+| POST | `/api/v1/project/create` | `path` (required) | Create a new project at the given path and open it. |
+| POST | `/api/v1/project/open` | `path` (required) | Open an existing `.project` file. |
+| POST | `/api/v1/project/save` | — | Save the currently open project. |
+| POST | `/api/v1/project/close` | — | Close the currently open project. |
+| GET  | `/api/v1/project/list` | — | List projects known to the active session. |
+| POST | `/api/v1/project/compile` | — | Build the active project; returns CODESYS message-store counts. |
+| POST | `/api/v1/project/import-xml` | `xml_path` (required) | Import a PLCopen XML file into the active project. |
+
+### POU
+
+| Method | Path | Body params | Description |
+| --- | --- | --- | --- |
+| POST | `/api/v1/pou/create` | `name`, `type`, `language` (all required) | Create a new POU. `type`: `FunctionBlock`/`Function`/`Program`. `language`: `ST`/`FBD`/`LD`/`IL`/`CFC`. |
+| POST | `/api/v1/pou/code` | `path` (required), plus at least one of `declaration`, `implementation`, `code` | Set POU declaration and/or implementation text. `path` is the scriptengine tree path, e.g. `Application\MyFB`. Declaration must omit the POU header line. |
+| GET  | `/api/v1/pou/list` | — | List POUs in the active project. |
+
+### Script
+
+| Method | Path | Body params | Description |
+| --- | --- | --- | --- |
+| POST | `/api/v1/script/execute` | `script` (required) | Execute arbitrary IronPython 2.7 code inside CODESYS. Use with caution. |
+
+### System
+
+| Method | Path | Body params | Description |
+| --- | --- | --- | --- |
+| GET | `/api/v1/system/info` | — | Return server and CODESYS process metadata. |
+| GET | `/api/v1/system/logs` | — | Return recent log entries from the server. |
 
 ## Deployment as Windows Service
 The system can be wrapped as a Windows Service for persistent background operation.

@@ -19,6 +19,8 @@ class EngineCapabilities:
     pou_create: bool
     pou_code: bool
     pou_list: bool
+    project_import_xml_content: bool = False
+    project_import_xml_b64: bool = False
 
 
 @dataclass(frozen=True)
