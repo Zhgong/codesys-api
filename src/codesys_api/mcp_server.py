@@ -8,12 +8,12 @@ from typing import TYPE_CHECKING
 
 from mcp.server.fastmcp import FastMCP
 
-from .action_layer import ActionRequest, ActionType
+from .action_layer import ActionRequest, ActionServiceLike, ActionType
 from .app_runtime import build_app_runtime
 from .server_config import load_server_config
 
 if TYPE_CHECKING:
-    from .action_layer import ActionResult, ActionService
+    from .action_layer import ActionResult
 
 
 class CodesysToolDispatcher:
@@ -23,7 +23,7 @@ class CodesysToolDispatcher:
     and returns the result body as a JSON string.
     """
 
-    def __init__(self, actions_service: ActionService) -> None:
+    def __init__(self, actions_service: ActionServiceLike) -> None:
         self._svc = actions_service
 
     def _call(self, action: ActionType, params: dict[str, object] | None = None) -> str:

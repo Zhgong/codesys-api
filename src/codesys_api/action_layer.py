@@ -85,6 +85,12 @@ class ActionResult:
     request_id: str | None = field(default=None, repr=False)
 
 
+class ActionServiceLike(Protocol):
+    """Structural type accepted by CodesysToolDispatcher — anything with execute()."""
+
+    def execute(self, request: ActionRequest) -> ActionResult: ...
+
+
 def _write_temp_xml(data: bytes) -> str:
     """Write *data* to a new temp .xml file under C:\\tmp and return its path."""
     import tempfile
