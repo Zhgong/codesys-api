@@ -54,6 +54,27 @@ def test_project_create_script_uses_proven_primitives() -> None:
     assert '"cleanup_succeeded": cleanup_succeeded' in script
 
 
+def test_project_create_skeleton_false_omits_device_and_pou() -> None:
+    adapter = make_adapter()
+
+    script = adapter.build_execution(
+        "project.create",
+        {"path": r"C:\repo\Bare.project", "skeleton": False},
+    ).script
+
+    # Empty project is still created via the proven primitive
+    assert "scriptengine.projects.create(" in script
+    assert 'session.active_project = project' in script
+
+    # But none of the skeleton scaffolding appears
+    assert "project.add(" not in script
+    assert "app.create_pou(" not in script
+    assert "app.create_task_configuration()" not in script
+    assert "PLC_PRG" not in script
+    assert "MainTask" not in script
+    assert "CODESYS Control Win V3 x64" not in script
+
+
 def test_project_open_script_uses_global_projects_instance() -> None:
     adapter = make_adapter()
     project_path = r"C:\repo\Demo.project"

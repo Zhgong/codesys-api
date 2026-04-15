@@ -53,6 +53,12 @@ def normalize_project_create_params(
     normalized.setdefault("device_id", DEFAULT_DEVICE_ID)
     normalized.setdefault("device_version", DEFAULT_DEVICE_VERSION)
 
+    raw_skeleton = normalized.get("skeleton", True)
+    if isinstance(raw_skeleton, str):
+        normalized["skeleton"] = raw_skeleton.strip().lower() not in ("false", "0", "no")
+    else:
+        normalized["skeleton"] = bool(raw_skeleton)
+
     return normalized
 
 

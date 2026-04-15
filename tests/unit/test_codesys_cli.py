@@ -173,7 +173,23 @@ def test_cli_project_create_maps_path_and_prints_project_summary() -> None:
     assert exit_code == 0
     assert stdout.getvalue().strip() == "Project ready: C:/demo.project"
     assert service.requests[0].action.value == "project.create"
-    assert service.requests[0].params == {"path": "C:/demo.project"}
+    assert service.requests[0].params == {"path": "C:/demo.project", "skeleton": True}
+
+
+def test_cli_project_create_no_skeleton_sets_skeleton_false() -> None:
+    service = FakeActionService(
+        ActionResult(body={"success": True, "project": {"path": "C:/bare.project"}})
+    )
+    stdout = io.StringIO()
+
+    exit_code = run_cli(
+        ["project", "create", "--path", "C:/bare.project", "--no-skeleton"],
+        action_service=cast(Any, service),
+        stdout=stdout,
+    )
+
+    assert exit_code == 0
+    assert service.requests[0].params == {"path": "C:/bare.project", "skeleton": False}
 
 
 def test_cli_project_save_maps_action_and_prints_message() -> None:

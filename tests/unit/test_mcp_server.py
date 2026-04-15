@@ -74,7 +74,15 @@ def test_project_create_passes_path() -> None:
     dispatcher.project_create(path=r"C:\work\demo.project")
     assert svc.last_request is not None
     assert svc.last_request.action == ActionType.PROJECT_CREATE
-    assert svc.last_request.params == {"path": r"C:\work\demo.project"}
+    assert svc.last_request.params == {"path": r"C:\work\demo.project", "skeleton": True}
+
+
+def test_project_create_passes_skeleton_false() -> None:
+    dispatcher, svc = make_dispatcher()
+    dispatcher.project_create(path=r"C:\work\bare.project", skeleton=False)
+    assert svc.last_request is not None
+    assert svc.last_request.action == ActionType.PROJECT_CREATE
+    assert svc.last_request.params == {"path": r"C:\work\bare.project", "skeleton": False}
 
 
 def test_project_open_passes_path() -> None:

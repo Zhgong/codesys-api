@@ -40,6 +40,36 @@ def test_normalize_project_create_params_normalizes_windows_slashes() -> None:
     assert params["path"] == r"C:\Temp\MyProject.project"
 
 
+def test_normalize_project_create_params_skeleton_defaults_to_true() -> None:
+    params = normalize_project_create_params(
+        {"path": r"C:\Temp\Test.project"},
+        r"C:\repo",
+        "20260317_223000",
+    )
+
+    assert params["skeleton"] is True
+
+
+def test_normalize_project_create_params_skeleton_false_is_preserved() -> None:
+    params = normalize_project_create_params(
+        {"path": r"C:\Temp\Test.project", "skeleton": False},
+        r"C:\repo",
+        "20260317_223000",
+    )
+
+    assert params["skeleton"] is False
+
+
+def test_normalize_project_create_params_skeleton_string_false_is_normalized() -> None:
+    params = normalize_project_create_params(
+        {"path": r"C:\Temp\Test.project", "skeleton": "false"},
+        r"C:\repo",
+        "20260317_223000",
+    )
+
+    assert params["skeleton"] is False
+
+
 def test_validate_required_params_reports_first_missing_key() -> None:
     error = validate_required_params({"name": "MotorStarter"}, ["name", "type", "language"])
 

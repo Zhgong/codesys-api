@@ -168,6 +168,13 @@ def build_parser() -> argparse.ArgumentParser:
     project_subparsers = project_parser.add_subparsers(dest="operation", required=True)
     project_create = project_subparsers.add_parser("create", help="Create a project")
     project_create.add_argument("--path", required=True)
+    project_create.add_argument(
+        "--no-skeleton",
+        dest="skeleton",
+        action="store_false",
+        default=True,
+        help="Create a bare empty project without the default device/PLC_PRG/MainTask scaffolding (use before importing PLCopen XML)",
+    )
     project_open = project_subparsers.add_parser("open", help="Open a project")
     project_open.add_argument("--path", required=True)
     project_subparsers.add_parser("save", help="Save the active project")
@@ -271,7 +278,10 @@ def _build_action_request(args: argparse.Namespace) -> ActionRequest:
 
     if args.resource == "project":
         if args.operation == "create":
-            return ActionRequest(action=ActionType.PROJECT_CREATE, params={"path": args.path})
+            return ActionRequest(
+                action=ActionType.PROJECT_CREATE,
+                params={"path": args.path, "skeleton": args.skeleton},
+            )
         if args.operation == "open":
             return ActionRequest(action=ActionType.PROJECT_OPEN, params={"path": args.path})
         if args.operation == "save":

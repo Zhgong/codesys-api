@@ -179,6 +179,9 @@ except Exception as e:
 """
 
     def _generate_project_create_script(self, params: dict[str, object]) -> str:
+        if not bool(params.get("skeleton", True)):
+            return self._generate_empty_project_script(params)
+
         path = str(params.get("path", "")).replace("/", "\\")
         device_name = str(params.get("device_name", "CODESYS Control Win V3 x64"))
         raw_device_type = params.get("device_type", 4096)
@@ -337,6 +340,48 @@ except:
             create_task_fragment=create_task_fragment,
             assign_fragment=assign_fragment,
         )
+
+    def _generate_empty_project_script(self, params: dict[str, object]) -> str:
+        path = str(params.get("path", "")).replace("/", "\\")
+        create_fragment = proven_primitives.build_create_empty_project_fragment(path)
+
+        return """
+import scriptengine
+import sys
+import traceback
+
+try:
+    stage = "create_project"
+    project = None
+    print("project_create_stage=" + stage)
+    {create_fragment}
+    if project is None:
+        raise Exception("projects.create returned None")
+    print("Empty project created at: " + str(project.path if hasattr(project, 'path') else ""))
+
+    stage = "finalize_session_state"
+    print("project_create_stage=" + stage)
+    session.active_project = project
+
+    result = {{
+        "success": True,
+        "project": {{
+            "path": project.path if hasattr(project, 'path') else "",
+            "name": project.name if hasattr(project, 'name') else "",
+            "dirty": project.dirty if hasattr(project, 'dirty') else False
+        }}
+    }}
+except:
+    error_type, error_value, error_traceback = sys.exc_info()
+    print("Error creating empty project at stage " + str(stage) + ": " + str(error_value))
+    print(traceback.format_exc())
+    try:
+        if project is not None and hasattr(project, 'close'):
+            project.close()
+    except Exception:
+        pass
+    result = {{"success": False, "error": str(error_value), "stage": stage}}
+""".format(create_fragment=create_fragment)
 
     def _generate_project_open_script(self, params: dict[str, object]) -> str:
         path = str(params.get("path", ""))

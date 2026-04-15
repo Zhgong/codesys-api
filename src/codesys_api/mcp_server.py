@@ -48,8 +48,8 @@ class CodesysToolDispatcher:
 
     # --- Project ---
 
-    def project_create(self, path: str) -> str:
-        return self._call(ActionType.PROJECT_CREATE, {"path": path})
+    def project_create(self, path: str, skeleton: bool = True) -> str:
+        return self._call(ActionType.PROJECT_CREATE, {"path": path, "skeleton": skeleton})
 
     def project_open(self, path: str) -> str:
         return self._call(ActionType.PROJECT_OPEN, {"path": path})
@@ -138,9 +138,16 @@ def create_mcp_server(
         return dispatcher.session_status()
 
     @mcp.tool()
-    def project_create(path: str) -> str:
-        """Create a new CODESYS project at the given absolute path and open it."""
-        return dispatcher.project_create(path=path)
+    def project_create(path: str, skeleton: bool = True) -> str:
+        """Create a new CODESYS project at the given absolute path and open it.
+
+        When skeleton is True (default), the project is seeded with a default
+        device, PLC_PRG, MainTask, and task configuration. Pass skeleton=False
+        to create a bare empty project — useful right before importing a
+        PLCopen XML that already contains its own device tree (otherwise the
+        project ends up with two devices).
+        """
+        return dispatcher.project_create(path=path, skeleton=skeleton)
 
     @mcp.tool()
     def project_open(path: str) -> str:
