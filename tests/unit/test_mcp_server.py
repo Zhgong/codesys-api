@@ -22,7 +22,7 @@ class FakeActionService:
 
 
 def make_dispatcher(result: dict[str, object] | None = None) -> tuple[CodesysToolDispatcher, FakeActionService]:
-    r = result if result is not None else {"success": True}
+    r: dict[str, object] = result if result is not None else {"success": True}
     svc = FakeActionService(r)
     return CodesysToolDispatcher(svc), svc
 
