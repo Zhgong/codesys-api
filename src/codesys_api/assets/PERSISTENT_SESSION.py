@@ -375,6 +375,16 @@ class CodesysPersistentSession(object):
     def execute_script_content(self, script_code, script_label):
         """Execute already-loaded script code in the CODESYS environment."""
         try:
+            # Handle recovery logic: if active_project is lost, try to recover it
+            if self.active_project is None:
+                try:
+                    if hasattr(scriptengine, 'projects') and hasattr(scriptengine.projects, 'primary'):
+                        self.active_project = scriptengine.projects.primary
+                        if self.active_project:
+                            self.log("Recovered active_project handle from scriptengine.projects.primary")
+                except Exception, recovery_e:
+                    self.log("Failed to recover project handle: %s" % str(recovery_e))
+
             globals_dict = {
                 "session": self,
                 "system": self.system,

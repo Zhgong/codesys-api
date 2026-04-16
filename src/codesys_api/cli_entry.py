@@ -57,6 +57,7 @@ def _build_usage_examples() -> str:
     return (
         "Examples:\n"
         "  codesys-tools session start\n"
+        "  codesys-tools doctor\n"
         "  codesys-tools project create --path C:\\work\\demo.project\n"
         "  codesys-tools pou create --name MotorController --type FunctionBlock --language ST\n"
         "  codesys-tools project compile --clean-build\n"
@@ -102,6 +103,13 @@ def _build_pou_help_examples() -> str:
     )
 
 
+def _build_doctor_help() -> str:
+    return (
+        "Check system environment and dependencies.\n\n"
+        "The doctor command runs read-only diagnostics and reports PASS/FAIL/WARN checks."
+    )
+
+
 def _build_project_compile_help() -> str:
     return (
         "Compile the active project.\n\n"
@@ -130,6 +138,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--json", action="store_true", dest="as_json", help="Output structured JSON")
     subparsers = parser.add_subparsers(dest="resource", required=True)
 
+    subparsers.add_parser(
+        "doctor",
+        help="Check system environment and dependencies",
+        description=_build_doctor_help(),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+
     session_parser = subparsers.add_parser(
         "session",
         help="Session operations",
@@ -153,6 +168,13 @@ def build_parser() -> argparse.ArgumentParser:
     project_subparsers = project_parser.add_subparsers(dest="operation", required=True)
     project_create = project_subparsers.add_parser("create", help="Create a project")
     project_create.add_argument("--path", required=True)
+    project_create.add_argument(
+        "--no-skeleton",
+        dest="skeleton",
+        action="store_false",
+        default=True,
+        help="Create a bare empty project without the default device/PLC_PRG/MainTask scaffolding (use before importing PLCopen XML)",
+    )
     project_open = project_subparsers.add_parser("open", help="Open a project")
     project_open.add_argument("--path", required=True)
     project_subparsers.add_parser("save", help="Save the active project")
@@ -165,6 +187,18 @@ def build_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     project_compile.add_argument("--clean-build", action="store_true", default=False)
+    project_import_xml = project_subparsers.add_parser(
+        "import-xml", help="Import a PLCopen XML file into the active project"
+    )
+    project_import_xml.add_argument(
+        "--xml-path", required=True, help="Path to PLCopen XML file"
+    )
+    project_import_xml.add_argument(
+        "--import-folder-structure",
+        action="store_true",
+        default=False,
+        help="Also import folder structure (CODESYS proprietary extension)",
+    )
 
     pou_parser = subparsers.add_parser(
         "pou",
@@ -230,6 +264,9 @@ def _read_optional_file(file_path: str | None) -> str | None:
 
 
 def _build_action_request(args: argparse.Namespace) -> ActionRequest:
+    if args.resource == "doctor":
+        return ActionRequest(action=ActionType.SYSTEM_DOCTOR, params={})
+
     if args.resource == "session":
         action = {
             "start": ActionType.SESSION_START,
@@ -241,7 +278,10 @@ def _build_action_request(args: argparse.Namespace) -> ActionRequest:
 
     if args.resource == "project":
         if args.operation == "create":
-            return ActionRequest(action=ActionType.PROJECT_CREATE, params={"path": args.path})
+            return ActionRequest(
+                action=ActionType.PROJECT_CREATE,
+                params={"path": args.path, "skeleton": args.skeleton},
+            )
         if args.operation == "open":
             return ActionRequest(action=ActionType.PROJECT_OPEN, params={"path": args.path})
         if args.operation == "save":
@@ -250,6 +290,14 @@ def _build_action_request(args: argparse.Namespace) -> ActionRequest:
             return ActionRequest(action=ActionType.PROJECT_CLOSE, params={})
         if args.operation == "list":
             return ActionRequest(action=ActionType.PROJECT_LIST, params={})
+        if args.operation == "import-xml":
+            return ActionRequest(
+                action=ActionType.PROJECT_IMPORT_XML,
+                params={
+                    "xml_path": args.xml_path,
+                    "import_folder_structure": args.import_folder_structure,
+                },
+            )
         return ActionRequest(
             action=ActionType.PROJECT_COMPILE,
             params={"clean_build": bool(args.clean_build)},
@@ -275,6 +323,9 @@ def _build_action_request(args: argparse.Namespace) -> ActionRequest:
 
 def _format_human_result(action: ActionType, body: Mapping[str, object]) -> str:
     success = body.get("success") is True
+    if action == ActionType.SYSTEM_DOCTOR:
+        return "Doctor checks completed"
+
     if action == ActionType.SESSION_STATUS:
         status = body.get("status")
         if isinstance(status, Mapping):
@@ -319,6 +370,22 @@ def _format_human_result(action: ActionType, body: Mapping[str, object]) -> str:
             return "\n".join(project_lines) if project_lines else "No recent projects"
         return "Project list unavailable"
 
+    if action == ActionType.PROJECT_IMPORT_XML:
+        if success:
+            warnings = body.get("warnings", [])
+            if isinstance(warnings, list) and warnings:
+                return "Import succeeded with {0} warning(s):\n{1}".format(
+                    len(warnings),
+                    "\n".join("  " + w for w in warnings if isinstance(w, str)),
+                )
+            return "Import succeeded."
+        errors = body.get("errors")
+        if isinstance(errors, list) and errors:
+            return "Import failed:\n" + "\n".join(
+                "  " + e for e in errors if isinstance(e, str)
+            )
+        return "Import failed: {0}".format(body.get("error", "unknown error"))
+
     if action == ActionType.POU_LIST:
         pous = body.get("pous")
         container = body.get("container")
@@ -362,6 +429,45 @@ def _format_human_result(action: ActionType, body: Mapping[str, object]) -> str:
     if isinstance(message, str) and message:
         return message
     return "Action failed"
+
+
+def _doctor_check_lines(body: Mapping[str, object]) -> list[tuple[bool, str]]:
+    checks = body.get("checks")
+    if not isinstance(checks, list):
+        return [(True, "[FAIL] Doctor result missing checks list -> Re-run with --json and inspect payload.")]
+
+    lines: list[tuple[bool, str]] = []
+    for item in checks:
+        if not isinstance(item, Mapping):
+            lines.append((True, "[FAIL] Invalid doctor check entry -> Re-run doctor and inspect logs."))
+            continue
+
+        status_raw = item.get("status")
+        name_raw = item.get("name")
+        detail_raw = item.get("detail")
+        suggestion_raw = item.get("suggestion")
+
+        status = status_raw if isinstance(status_raw, str) and status_raw else "FAIL"
+        name = name_raw if isinstance(name_raw, str) and name_raw else "Unnamed check"
+        detail = detail_raw if isinstance(detail_raw, str) and detail_raw else ""
+        suggestion = suggestion_raw if isinstance(suggestion_raw, str) and suggestion_raw else ""
+
+        line = "[{0}] {1}".format(status, name)
+        if detail:
+            line += ": {0}".format(detail)
+        if status != "PASS" and suggestion:
+            line += " -> {0}".format(suggestion)
+
+        lines.append((status == "FAIL", line))
+
+    return lines
+
+
+def _doctor_has_failures(body: Mapping[str, object]) -> bool:
+    for is_fail, _line in _doctor_check_lines(body):
+        if is_fail:
+            return True
+    return False
 
 
 def run_cli(
@@ -421,13 +527,19 @@ def run_cli(
     if args.as_json:
         print(json.dumps(body), file=stdout)
     else:
-        success_value = body.get("success")
-        success = success_value if isinstance(success_value, bool) else False
-        target = stdout if result.status_code < 400 and success else stderr
-        print(_format_human_result(request.action, body), file=target)
+        if request.action == ActionType.SYSTEM_DOCTOR:
+            for is_fail, line in _doctor_check_lines(body):
+                print(line, file=stderr if is_fail else stdout)
+        else:
+            success_value = body.get("success")
+            success = success_value if isinstance(success_value, bool) else False
+            target = stdout if result.status_code < 400 and success else stderr
+            print(_format_human_result(request.action, body), file=target)
 
     success_value = body.get("success")
     success = success_value if isinstance(success_value, bool) else False
+    if request.action == ActionType.SYSTEM_DOCTOR and _doctor_has_failures(body):
+        return 1
     if result.status_code >= 400 or not success:
         return 1
     return 0

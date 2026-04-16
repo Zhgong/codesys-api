@@ -31,6 +31,9 @@ class IronPythonScriptEngineAdapter:
             project_close=True,
             project_list=True,
             project_compile=True,
+            project_import_xml=True,
+            project_import_xml_content=True,
+            project_import_xml_b64=True,
             pou_create=True,
             pou_code=True,
             pou_list=True,
@@ -58,6 +61,8 @@ class IronPythonScriptEngineAdapter:
             return ExecutionSpec(script=self._generate_project_list_script(), timeout=30)
         if action == "project.compile":
             return ExecutionSpec(script=self._generate_project_compile_script(params), timeout=300)
+        if action in ("project.import_xml", "project.import_xml_content", "project.import_xml_b64"):
+            return ExecutionSpec(script=self._generate_project_import_xml_script(params), timeout=60)
         if action == "pou.create":
             return ExecutionSpec(script=self._generate_pou_create_script(params), timeout=30)
         if action == "pou.code":
@@ -174,6 +179,9 @@ except Exception as e:
 """
 
     def _generate_project_create_script(self, params: dict[str, object]) -> str:
+        if not bool(params.get("skeleton", True)):
+            return self._generate_empty_project_script(params)
+
         path = str(params.get("path", "")).replace("/", "\\")
         device_name = str(params.get("device_name", "CODESYS Control Win V3 x64"))
         raw_device_type = params.get("device_type", 4096)
@@ -332,6 +340,48 @@ except:
             create_task_fragment=create_task_fragment,
             assign_fragment=assign_fragment,
         )
+
+    def _generate_empty_project_script(self, params: dict[str, object]) -> str:
+        path = str(params.get("path", "")).replace("/", "\\")
+        create_fragment = proven_primitives.build_create_empty_project_fragment(path)
+
+        return """
+import scriptengine
+import sys
+import traceback
+
+try:
+    stage = "create_project"
+    project = None
+    print("project_create_stage=" + stage)
+    {create_fragment}
+    if project is None:
+        raise Exception("projects.create returned None")
+    print("Empty project created at: " + str(project.path if hasattr(project, 'path') else ""))
+
+    stage = "finalize_session_state"
+    print("project_create_stage=" + stage)
+    session.active_project = project
+
+    result = {{
+        "success": True,
+        "project": {{
+            "path": project.path if hasattr(project, 'path') else "",
+            "name": project.name if hasattr(project, 'name') else "",
+            "dirty": project.dirty if hasattr(project, 'dirty') else False
+        }}
+    }}
+except:
+    error_type, error_value, error_traceback = sys.exc_info()
+    print("Error creating empty project at stage " + str(stage) + ": " + str(error_value))
+    print(traceback.format_exc())
+    try:
+        if project is not None and hasattr(project, 'close'):
+            project.close()
+    except Exception:
+        pass
+    result = {{"success": False, "error": str(error_value), "stage": stage}}
+""".format(create_fragment=create_fragment)
 
     def _generate_project_open_script(self, params: dict[str, object]) -> str:
         path = str(params.get("path", ""))
@@ -506,12 +556,20 @@ except Exception:
         name = str(params.get("name", ""))
         pou_type = str(params.get("type", "Program"))
         language = str(params.get("language", "ST"))
+        implements = params.get("implements", [])
+        
+        implements_str = ""
+        if isinstance(implements, list) and implements:
+            implements_str = ", ".join(str(i) for i in implements)
+        elif isinstance(implements, str) and implements.strip():
+            implements_str = implements
 
         return """
 import scriptengine
 import json
 import sys
 import traceback
+import time
 
 try:
     print("Starting POU creation script")
@@ -534,6 +592,8 @@ try:
             "CFC": scriptengine.ImplementationLanguages.cfc
         }}
         language_guid = language_map.get("{2}".upper(), scriptengine.ImplementationLanguages.st)
+        
+        # 1. Create the POU
         if hasattr(app, 'pou_container'):
             created_pou = app.pou_container.create_pou(
                 name="{0}",
@@ -546,6 +606,22 @@ try:
                 type=pou_type_map["{1}"],
                 language=language_guid
             )
+        
+        # Wait a bit for CODESYS to stabilize the object
+        time.sleep(0.5)
+
+        # 2. Apply IMPLEMENTS if specified
+        target_implements = "{3}"
+        if target_implements and hasattr(created_pou, 'textual_declaration'):
+            # Construct a proper declaration with IMPLEMENTS
+            decl_header = "{1}".upper().replace("FUNCTIONBLOCK", "FUNCTION_BLOCK")
+            new_decl = decl_header + " {0} IMPLEMENTS " + target_implements + "\\nVAR\\nEND_VAR"
+            try:
+                # Some CODESYS versions prefer replace, some set_text
+                created_pou.textual_declaration.replace(new_decl)
+            except:
+                pass
+
         if not hasattr(session, 'created_pous'):
             session.created_pous = {{}}
         session.created_pous["{0}"] = created_pou
@@ -562,7 +638,7 @@ except Exception:
     print("Error in POU creation script: " + str(error_value))
     print(traceback.format_exc())
     result = {{"success": False, "error": str(error_value)}}
-""".format(name, pou_type, language)
+""".format(name, pou_type, language, implements_str)
 
     def _generate_pou_code_script(self, params: dict[str, object]) -> str:
         path = str(params.get("path", ""))
@@ -575,6 +651,7 @@ import scriptengine
 import json
 import sys
 import traceback
+import time
 
 try:
     print("Starting POU code setting script for {0}")
@@ -585,41 +662,57 @@ try:
         target = None
         raw_path = "{0}"
         normalized_path = raw_path.replace("\\\\", "/")
-        target_name = normalized_path.split("/")[-1]
-        if hasattr(session, 'created_pous'):
+        target_name = normalized_path.split("/")[-1].split(".")[-1]
+        search_terms = [raw_path]
+
+        # 1. Resolve target
+        if hasattr(session, \'created_pous\'):
             target = session.created_pous.get(target_name)
+        if target_name not in search_terms:
+            target = None
         if target is None:
-            search_terms = [raw_path]
-            if normalized_path != raw_path:
-                search_terms.append(normalized_path)
-            if target_name not in search_terms:
-                search_terms.append(target_name)
-            for search_term in search_terms:
-                search_result = project.find(search_term)
-                if search_result is None:
-                    continue
-                if hasattr(search_result, 'textual_declaration') or hasattr(search_result, 'set_implementation_code'):
-                    target = search_result
-                    break
-                if hasattr(search_result, '__iter__'):
-                    for candidate in search_result:
-                        if hasattr(candidate, 'textual_declaration') or hasattr(candidate, 'set_implementation_code'):
-                            target = candidate
-                            break
-                if target is not None:
-                    break
+            # Try finding in the project
+            found = project.find(raw_path)
+            if found:
+                target = found[0] if hasattr(found, \'__iter__\') else found
+        
         if target is None:
             result = {{"success": False, "error": "POU not found: {0}"}}
         else:
-            if "{1}":
-                target.textual_declaration.replace(new_text="{1}")
-            if "{2}":
-                target.textual_implementation.replace(new_text="{2}")
-            if "{3}" and not "{1}" and not "{2}":
-                if hasattr(target, 'set_implementation_code'):
-                    target.set_implementation_code("{3}")
+            # 2. Process Method extraction and creation
+            full_code = "{3}"
+            if "METHOD" in full_code and hasattr(target, "create_method"):
+                # Simple extraction of METHOD name from ST: METHOD <Name> : <Type>
+                import re
+                method_matches = re.findall(r"METHOD\s+(\w+)", full_code, re.IGNORECASE)
+                for m_name in method_matches:
+                    try:
+                        # Create method object if it doesn't exist
+                        target.create_method(m_name, scriptengine.ImplementationLanguages.st)
+                        print("Created child method object: " + m_name)
+                    except:
+                        pass # Might already exist
+
+            # 3. Apply declaration and implementation
+            decl_to_set = "{1}"
+            impl_to_set = "{2}"
+            
+            # If full code is provided, try to split it into Decl and Body
+            if full_code and not decl_to_set and not impl_to_set:
+                parts = full_code.split("END_VAR", 1)
+                if len(parts) == 2:
+                    decl_to_set = parts[0] + "END_VAR"
+                    impl_to_set = parts[1].strip()
+                    # Strip closing tags if needed
+                    impl_to_set = impl_to_set.replace("END_FUNCTION_BLOCK", "").replace("END_PROGRAM", "").strip()
                 else:
-                    target.textual_implementation.replace(new_text="{3}")
+                    impl_to_set = full_code
+
+            if decl_to_set and hasattr(target, "textual_declaration"):
+                target.textual_declaration.replace(new_text=decl_to_set)
+            if impl_to_set and hasattr(target, "textual_implementation"):
+                target.textual_implementation.replace(new_text=impl_to_set)
+                
             result = {{"success": True, "message": "POU code updated successfully"}}
 except Exception:
     error_type, error_value, error_traceback = sys.exc_info()
@@ -917,3 +1010,34 @@ except Exception:
         "message_counts": {{"errors": 1, "warnings": 0, "infos": 0}}
     }}
 """.format("True" if clean_build else "False", "True" if safe_message_harvest else "False")
+
+    def _generate_project_import_xml_script(self, params: dict[str, object]) -> str:
+        xml_path = str(params.get("xml_path", ""))
+        import_fragment = proven_primitives.build_import_xml_fragment(xml_path)
+        return """\
+import json
+import sys
+
+try:
+    project = session.active_project
+    if project is None:
+        result = {{"success": False, "error": "No active project", "warnings": [], "errors": []}}
+    else:
+        class _Reporter(object):
+            def __init__(self): self.errors = []; self.warnings = []
+            def error(self, m): self.errors.append(str(m))
+            def warning(self, m): self.warnings.append(str(m))
+            def resolve_conflict(self, o): return scriptengine.ConflictResolve.Skip
+            def added(self, o): pass
+            def replaced(self, o): pass
+            def skipped(self, n): pass
+        reporter = _Reporter()
+        {import_fragment}
+        result = {{
+            "success": len(reporter.errors) == 0,
+            "warnings": reporter.warnings,
+            "errors": reporter.errors,
+        }}
+except Exception as _e:
+    result = {{"success": False, "error": str(_e), "warnings": [], "errors": []}}
+""".format(import_fragment=import_fragment)

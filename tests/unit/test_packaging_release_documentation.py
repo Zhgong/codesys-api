@@ -7,7 +7,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_packaging_doc_references_release_helper_and_build_command() -> None:
-    packaging = (REPO_ROOT / "docs" / "PACKAGING.md").read_text(encoding="utf-8")
+    packaging = (REPO_ROOT / "docs" / "raw" / "PACKAGING.md").read_text(encoding="utf-8")
 
     assert "python scripts\\build_release.py" in packaging
     assert "python -m build" in packaging

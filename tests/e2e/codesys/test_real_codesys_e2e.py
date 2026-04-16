@@ -173,6 +173,23 @@ def assert_session_started(base_url: str) -> None:
     assert payload["success"] is True
 
 
+def assert_session_started_with_retry(base_url: str, *, max_attempts: int = 3, delay: float = 8.0) -> None:
+    """Start session with retries to handle the known per-lifecycle CODESYS startup delay.
+
+    After several stop/start cycles the CODESYS process briefly returns 500 on
+    session/start due to a per-lifecycle resource leak in codesys_process.py.
+    """
+    last_payload: dict[str, object] = {}
+    for attempt in range(max_attempts):
+        status_code, payload = start_session(base_url)
+        last_payload = payload
+        if status_code == 200 and payload.get("success") is True:
+            return
+        if attempt < max_attempts - 1:
+            time.sleep(delay)
+    assert False, f"session/start failed after {max_attempts} attempts: {last_payload}"
+
+
 @pytest.fixture(scope="module")
 def real_server() -> Generator[tuple[str, subprocess.Popen[str]], None, None]:
     env = codesys_env()
@@ -519,3 +536,136 @@ def test_real_codesys_compile_succeeds_with_valid_project(
     )
     assert status_code == 200
     assert payload["success"] is True
+
+
+# ---------------------------------------------------------------------------
+# PLCopen XML import E2E tests
+# ---------------------------------------------------------------------------
+
+def _build_export_xml_script(dest_path: str) -> str:
+    escaped = dest_path.replace("\\", "\\\\").replace('"', '\\"')
+    return """\
+import json
+import sys
+import traceback
+
+try:
+    project = session.active_project
+    if project is None:
+        result = {{"success": False, "error": "No active project"}}
+    else:
+        all_objects = list(project.get_children(True))
+        project.export_xml(all_objects, "{dest}")
+        result = {{"success": True, "dest_path": "{dest}"}}
+except Exception:
+    _et, _ev, _etb = sys.exc_info()
+    result = {{"success": False, "error": str(_ev), "traceback": traceback.format_exc()}}
+""".format(dest=escaped)
+
+
+@pytest.mark.codesys
+@pytest.mark.codesys_slow
+def test_real_codesys_import_xml_succeeds(
+    real_server: tuple[str, subprocess.Popen[str]],
+) -> None:
+    """Export a project to PLCopen XML then import it back — expects 200 with no errors."""
+    base_url, _process = real_server
+    stop_session(base_url)
+    assert_session_started_with_retry(base_url)
+
+    project_path = str(Path(tempfile.gettempdir()) / f"codesys_api_import_xml_{uuid.uuid4().hex}.project")
+    xml_path = project_path.replace(".project", "_export.xml")
+
+    # Create project with a POU so there is something to export
+    status_code, payload = call_json(
+        base_url, "/api/v1/project/create", method="POST",
+        payload={"path": project_path}, timeout=120,
+    )
+    assert status_code == 200
+    assert payload["success"] is True
+
+    status_code, payload = call_json(
+        base_url, "/api/v1/pou/create", method="POST",
+        payload={"name": "ImportXmlProbe", "type": "Program", "language": "ST"},
+        timeout=120,
+    )
+    assert status_code == 200
+    assert payload["success"] is True
+
+    # Export project to PLCopen XML via script/execute
+    status_code, payload = call_json(
+        base_url, "/api/v1/script/execute", method="POST",
+        payload={"script": _build_export_xml_script(xml_path)}, timeout=60,
+    )
+    assert status_code == 200, f"export_xml script failed: {payload}"
+    assert payload["success"] is True, f"export_xml returned error: {payload.get('error')}"
+
+    # Import the exported XML back into the same project
+    status_code, payload = call_json(
+        base_url, "/api/v1/project/import-xml", method="POST",
+        payload={"xml_path": xml_path}, timeout=60,
+    )
+    assert status_code == 200, f"import-xml returned {status_code}: {payload}"
+    assert payload["success"] is True, f"import-xml failed: {payload}"
+    assert payload.get("errors") == [], f"import-xml reported errors: {payload.get('errors')}"
+
+
+@pytest.mark.codesys
+@pytest.mark.codesys_slow
+def test_real_codesys_import_xml_without_active_project_fails(
+    real_server: tuple[str, subprocess.Popen[str]],
+) -> None:
+    """import-xml with no open project must return 500."""
+    base_url, _process = real_server
+    stop_session(base_url)
+    assert_session_started_with_retry(base_url)
+
+    # No project/create — session is active but no project is open
+    status_code, payload = call_json(
+        base_url, "/api/v1/project/import-xml", method="POST",
+        payload={"xml_path": "C:\\nonexistent\\file.xml"}, timeout=60,
+    )
+    assert status_code == 500
+    assert payload["success"] is False
+
+
+@pytest.mark.codesys
+@pytest.mark.codesys_slow
+def test_real_codesys_import_xml_nonexistent_file_fails(
+    real_server: tuple[str, subprocess.Popen[str]],
+) -> None:
+    """import-xml with a path that does not exist must return 500 with errors."""
+    base_url, _process = real_server
+    stop_session(base_url)
+    assert_session_started_with_retry(base_url)
+
+    project_path = str(Path(tempfile.gettempdir()) / f"codesys_api_import_xml_bad_{uuid.uuid4().hex}.project")
+    status_code, payload = call_json(
+        base_url, "/api/v1/project/create", method="POST",
+        payload={"path": project_path}, timeout=120,
+    )
+    assert status_code == 200
+    assert payload["success"] is True
+
+    status_code, payload = call_json(
+        base_url, "/api/v1/project/import-xml", method="POST",
+        payload={"xml_path": r"C:\this\path\does\not\exist.xml"}, timeout=60,
+    )
+    assert status_code == 500
+    assert payload["success"] is False
+
+
+@pytest.mark.codesys
+def test_real_codesys_import_xml_missing_param_returns_400(
+    real_server: tuple[str, subprocess.Popen[str]],
+) -> None:
+    """import-xml without xml_path must return 400 (param validation, no CODESYS needed)."""
+    base_url, _process = real_server
+
+    status_code, payload = call_json(
+        base_url, "/api/v1/project/import-xml", method="POST",
+        payload={}, timeout=30,
+    )
+    assert status_code == 400
+    assert payload["success"] is False
+    assert "xml_path" in str(payload.get("error", ""))

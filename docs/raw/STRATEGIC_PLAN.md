@@ -110,18 +110,16 @@ The repository layout has already shifted away from the flat root:
   - clean wheel-install smoke is validated
   - packaged console scripts and packaged assets resolve correctly
 
+### Completed
+
+- first TestPyPI publication + verification
+- first PyPI publication — `codesys-tools` 0.3.0 is live on PyPI
+
 ### Next Decision
 
-- first TestPyPI publication
-- first TestPyPI publication + verification
-- first PyPI publication
-- broader product-facing work
-- future AI/tool integration surfaces
-- broader public release decisions beyond internal distribution flow
-
-### Deferred
-
-- none in the old cleanup/release line; that line is now complete
+- expand proven CODESYS primitives (build output reading, symbol table access, code generation)
+- MCP server / AI tool integration surface
+- broader public release decisions (cross-platform support, support commitments)
 
 ## Guidance
 

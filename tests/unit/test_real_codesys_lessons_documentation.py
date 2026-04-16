@@ -7,7 +7,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_real_codesys_lessons_tracks_key_debugging_learnings() -> None:
-    content = (REPO_ROOT / "docs" / "REAL_CODESYS_LESSONS.md").read_text(encoding="utf-8")
+    content = (REPO_ROOT / "docs" / "raw" / "REAL_CODESYS_LESSONS.md").read_text(encoding="utf-8")
 
     assert "open(Standard.project)" in content
     assert "projects.create(...)" in content

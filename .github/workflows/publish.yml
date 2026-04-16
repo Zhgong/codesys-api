@@ -1,6 +1,9 @@
 name: Publish Package
 
 on:
+  push:
+    tags:
+      - 'v*.*.*'
   workflow_dispatch:
     inputs:
       target:
@@ -13,7 +16,22 @@ on:
 
 
 jobs:
+  resolve-target:
+    runs-on: ubuntu-latest
+    outputs:
+      target: ${{ steps.set.outputs.target }}
+    steps:
+      - name: Resolve publish target
+        id: set
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "target=testpypi" >> "$GITHUB_OUTPUT"
+          else
+            echo "target=${{ inputs.target }}" >> "$GITHUB_OUTPUT"
+          fi
+
   build:
+    needs: resolve-target
     runs-on: windows-latest
 
     steps:
@@ -49,9 +67,9 @@ jobs:
           path: dist/*
 
   publish:
-    needs: build
+    needs: [resolve-target, build]
     runs-on: ubuntu-latest
-    environment: ${{ inputs.target }}
+    environment: ${{ needs.resolve-target.outputs.target }}
     permissions:
       id-token: write
 
@@ -63,14 +81,14 @@ jobs:
           path: dist
 
       - name: Publish to TestPyPI
-        if: inputs.target == 'testpypi'
+        if: needs.resolve-target.outputs.target == 'testpypi'
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
           packages-dir: dist
 
       - name: Publish to PyPI
-        if: inputs.target == 'pypi'
+        if: needs.resolve-target.outputs.target == 'pypi'
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: dist

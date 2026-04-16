@@ -217,6 +217,12 @@ class CodesysApiHandler(BaseHTTPRequestHandler):
                 self.handle_project_close()
             elif path == "api/v1/project/compile":
                 self.handle_project_compile(params)
+            elif path == "api/v1/project/import-xml":
+                self.handle_project_import_xml(params)
+            elif path == "api/v1/project/import-xml-content":
+                self.handle_project_import_xml_content(params)
+            elif path == "api/v1/project/import-xml-b64":
+                self.handle_project_import_xml_b64(params)
             elif path == "api/v1/pou/create":
                 self.handle_pou_create(params)
             elif path == "api/v1/pou/code":
@@ -406,6 +412,39 @@ class CodesysApiHandler(BaseHTTPRequestHandler):
         )
         self.send_json_response(result.body, result.status_code)
         
+    def handle_project_import_xml(self, params):
+        """Handle project/import-xml endpoint."""
+        result = self.actions_service.execute(
+            ActionRequest(
+                action=ActionType.PROJECT_IMPORT_XML,
+                params=params,
+                request_id=str(uuid.uuid4()),
+            )
+        )
+        self.send_json_response(result.body, result.status_code)
+
+    def handle_project_import_xml_content(self, params):
+        """Handle project/import-xml-content endpoint."""
+        result = self.actions_service.execute(
+            ActionRequest(
+                action=ActionType.PROJECT_IMPORT_XML_CONTENT,
+                params=params,
+                request_id=str(uuid.uuid4()),
+            )
+        )
+        self.send_json_response(result.body, result.status_code)
+
+    def handle_project_import_xml_b64(self, params):
+        """Handle project/import-xml-b64 endpoint."""
+        result = self.actions_service.execute(
+            ActionRequest(
+                action=ActionType.PROJECT_IMPORT_XML_B64,
+                params=params,
+                request_id=str(uuid.uuid4()),
+            )
+        )
+        self.send_json_response(result.body, result.status_code)
+
     def handle_pou_create(self, params):
         """Handle pou/create endpoint."""
         result = self.actions_service.execute(

@@ -1,13 +1,22 @@
 from __future__ import annotations
 
+import importlib
+import json
 import logging
+import os
+import socket
+import sys
 import time
+import uuid
+import urllib.error
+import urllib.request
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from typing import Callable, Protocol
 
 from .engine_adapter import EngineAdapter
+from .server_config import load_server_config
 from .server_logic import (
     build_status_payload,
     normalize_project_create_params,
@@ -45,6 +54,7 @@ class ActionType(str, Enum):
     SESSION_STOP = "session.stop"
     SESSION_RESTART = "session.restart"
     SESSION_STATUS = "session.status"
+    SYSTEM_DOCTOR = "system.doctor"
     SCRIPT_EXECUTE = "script.execute"
     PROJECT_CREATE = "project.create"
     PROJECT_OPEN = "project.open"
@@ -52,6 +62,9 @@ class ActionType(str, Enum):
     PROJECT_CLOSE = "project.close"
     PROJECT_LIST = "project.list"
     PROJECT_COMPILE = "project.compile"
+    PROJECT_IMPORT_XML = "project.import_xml"
+    PROJECT_IMPORT_XML_CONTENT = "project.import_xml_content"
+    PROJECT_IMPORT_XML_B64 = "project.import_xml_b64"
     POU_CREATE = "pou.create"
     POU_CODE = "pou.code"
     POU_LIST = "pou.list"
@@ -70,6 +83,32 @@ class ActionResult:
     body: dict[str, object]
     status_code: int = 200
     request_id: str | None = field(default=None, repr=False)
+
+
+class ActionServiceLike(Protocol):
+    """Structural type accepted by CodesysToolDispatcher — anything with execute()."""
+
+    def execute(self, request: ActionRequest) -> ActionResult: ...
+
+
+def _write_temp_xml(data: bytes) -> str:
+    """Write *data* to a new temp .xml file under C:\\tmp and return its path."""
+    import tempfile
+    os.makedirs(r"C:\tmp", exist_ok=True)
+    fd, path = tempfile.mkstemp(suffix=".xml", dir=r"C:\tmp")
+    try:
+        os.write(fd, data)
+    finally:
+        os.close(fd)
+    return path
+
+
+def _remove_temp(path: str) -> None:
+    """Delete a temp file, ignoring errors if it is already gone."""
+    try:
+        os.unlink(path)
+    except OSError:
+        pass
 
 
 class ActionService:
@@ -103,6 +142,8 @@ class ActionService:
             return self._session_restart(request)
         if request.action == ActionType.SESSION_STATUS:
             return self._session_status(request)
+        if request.action == ActionType.SYSTEM_DOCTOR:
+            return self._system_doctor(request)
         if request.action == ActionType.SCRIPT_EXECUTE:
             return self._script_execute(request)
         if request.action == ActionType.PROJECT_CREATE:
@@ -117,6 +158,12 @@ class ActionService:
             return self._project_list(request)
         if request.action == ActionType.PROJECT_COMPILE:
             return self._project_compile(request)
+        if request.action == ActionType.PROJECT_IMPORT_XML:
+            return self._project_import_xml(request)
+        if request.action == ActionType.PROJECT_IMPORT_XML_CONTENT:
+            return self._project_import_xml_content(request)
+        if request.action == ActionType.PROJECT_IMPORT_XML_B64:
+            return self._project_import_xml_b64(request)
         if request.action == ActionType.POU_CREATE:
             return self._pou_create(request)
         if request.action == ActionType.POU_CODE:
@@ -244,6 +291,344 @@ class ActionService:
             request_id=request.request_id,
         )
 
+    def _doctor_check(
+        self,
+        *,
+        name: str,
+        status: str,
+        detail: str,
+        suggestion: str,
+    ) -> dict[str, str]:
+        return {
+            "name": name,
+            "status": status,
+            "detail": detail,
+            "suggestion": suggestion,
+        }
+
+    def _check_python_dependency(self, module_name: str, install_hint: str) -> dict[str, str]:
+        try:
+            importlib.import_module(module_name)
+        except Exception as exc:
+            return self._doctor_check(
+                name="Python dependency: {0}".format(module_name),
+                status="FAIL",
+                detail="Cannot import '{0}': {1}".format(module_name, exc),
+                suggestion=install_hint,
+            )
+        return self._doctor_check(
+            name="Python dependency: {0}".format(module_name),
+            status="PASS",
+            detail="Module '{0}' is importable.".format(module_name),
+            suggestion="No action required.",
+        )
+
+    def _check_os_windows(self) -> dict[str, str]:
+        if sys.platform == "win32":
+            return self._doctor_check(
+                name="Operating system",
+                status="PASS",
+                detail="Detected Windows platform: {0}".format(sys.platform),
+                suggestion="No action required.",
+            )
+        return self._doctor_check(
+            name="Operating system",
+            status="FAIL",
+            detail="Unsupported platform detected: {0}".format(sys.platform),
+            suggestion="Use a Windows operating system.",
+        )
+
+    def _resolve_codesys_path_from_env(self) -> tuple[str, str] | None:
+        for key in ("CODESYS_API_CODESYS_PATH", "CODESYS_PATH"):
+            raw_value = os.environ.get(key)
+            if isinstance(raw_value, str):
+                value = raw_value.strip()
+                if value:
+                    return key, value
+        return None
+
+    def _check_codesys_profile_env(self) -> dict[str, str]:
+        profile_name = os.environ.get("CODESYS_API_CODESYS_PROFILE")
+        if isinstance(profile_name, str) and profile_name.strip():
+            return self._doctor_check(
+                name="CODESYS profile environment",
+                status="PASS",
+                detail="Using CODESYS_API_CODESYS_PROFILE={0}".format(profile_name.strip()),
+                suggestion="No action required.",
+            )
+        return self._doctor_check(
+            name="CODESYS profile environment",
+            status="FAIL",
+            detail="CODESYS_API_CODESYS_PROFILE is not defined.",
+            suggestion="Set CODESYS_API_CODESYS_PROFILE.",
+        )
+
+    def _check_config_file_validity(self) -> dict[str, str]:
+        try:
+            load_server_config(Path.cwd(), os.environ)
+        except json.JSONDecodeError as exc:
+            return self._doctor_check(
+                name="Configuration validity",
+                status="FAIL",
+                detail="Configuration parse failure: {0}".format(exc),
+                suggestion="Fix formatting errors in your .env or config file.",
+            )
+        except ValueError as exc:
+            return self._doctor_check(
+                name="Configuration validity",
+                status="FAIL",
+                detail="Invalid configuration value: {0}".format(exc),
+                suggestion="Fix formatting errors in your .env or config file.",
+            )
+        return self._doctor_check(
+            name="Configuration validity",
+            status="PASS",
+            detail="Server configuration loaded successfully.",
+            suggestion="No action required.",
+        )
+
+    def _check_codesys_path_env(self) -> dict[str, str]:
+        resolved = self._resolve_codesys_path_from_env()
+        if resolved is None:
+            return self._doctor_check(
+                name="CODESYS path environment",
+                status="FAIL",
+                detail="Neither CODESYS_API_CODESYS_PATH nor CODESYS_PATH is defined.",
+                suggestion="Set CODESYS_API_CODESYS_PATH to the full path of CODESYS.exe.",
+            )
+        key, value = resolved
+        return self._doctor_check(
+            name="CODESYS path environment",
+            status="PASS",
+            detail="Using {0}={1}".format(key, value),
+            suggestion="No action required.",
+        )
+
+    def _check_codesys_binary(self) -> dict[str, str]:
+        resolved = self._resolve_codesys_path_from_env()
+        if resolved is None:
+            return self._doctor_check(
+                name="CODESYS binary",
+                status="FAIL",
+                detail="CODESYS path environment variable is not configured.",
+                suggestion="Set CODESYS_API_CODESYS_PATH to CODESYS.exe before running doctor.",
+            )
+
+        _, value = resolved
+        codesys_path = Path(value)
+        if not codesys_path.exists():
+            return self._doctor_check(
+                name="CODESYS binary",
+                status="FAIL",
+                detail="Configured path does not exist: {0}".format(codesys_path),
+                suggestion="Verify CODESYS installation path and update CODESYS_API_CODESYS_PATH.",
+            )
+        if not codesys_path.is_file():
+            return self._doctor_check(
+                name="CODESYS binary",
+                status="FAIL",
+                detail="Configured path is not a file: {0}".format(codesys_path),
+                suggestion="Point CODESYS_API_CODESYS_PATH to the CODESYS.exe file.",
+            )
+        if not os.access(codesys_path, os.X_OK):
+            return self._doctor_check(
+                name="CODESYS binary",
+                status="FAIL",
+                detail="Current user lacks execute permission for: {0}".format(codesys_path),
+                suggestion="Grant execution permissions to the current user for CODESYS.exe.",
+            )
+        if codesys_path.name.lower() != "codesys.exe":
+            return self._doctor_check(
+                name="CODESYS binary",
+                status="WARN",
+                detail="Configured file is not named CODESYS.exe: {0}".format(codesys_path.name),
+                suggestion="Double-check the executable path if launch issues occur.",
+            )
+
+        return self._doctor_check(
+            name="CODESYS binary",
+            status="PASS",
+            detail="Binary exists: {0}".format(codesys_path),
+            suggestion="No action required.",
+        )
+
+    def _check_named_pipe_creation(self) -> dict[str, str]:
+        pipe_name = r"\\.\pipe\codesys_api_doctor_test_{0}".format(uuid.uuid4().hex)
+        handle: object | None = None
+        try:
+            import win32pipe  # type: ignore[import-untyped]
+        except Exception as exc:
+            return self._doctor_check(
+                name="Named pipe creation",
+                status="FAIL",
+                detail="Cannot import win32pipe: {0}".format(exc),
+                suggestion="Install dependency: pip install pywin32.",
+            )
+
+        try:
+            handle = win32pipe.CreateNamedPipe(
+                pipe_name,
+                win32pipe.PIPE_ACCESS_DUPLEX,
+                win32pipe.PIPE_TYPE_MESSAGE | win32pipe.PIPE_READMODE_MESSAGE | win32pipe.PIPE_WAIT,
+                win32pipe.PIPE_UNLIMITED_INSTANCES,
+                4096,
+                4096,
+                0,
+                None,
+            )
+        except Exception as exc:
+            return self._doctor_check(
+                name="Named pipe creation",
+                status="FAIL",
+                detail="Failed to create named pipe '{0}': {1}".format(pipe_name, exc),
+                suggestion="Check administrator privileges or Windows pipe permissions.",
+            )
+        finally:
+            if handle is not None:
+                close_method = getattr(handle, "Close", None)
+                if callable(close_method):
+                    close_method()
+                else:
+                    try:
+                        import win32file  # type: ignore[import-untyped]
+
+                        win32file.CloseHandle(handle)
+                    except Exception:
+                        pass
+
+        return self._doctor_check(
+            name="Named pipe creation",
+            status="PASS",
+            detail="Successfully created probe pipe: {0}".format(pipe_name),
+            suggestion="No action required.",
+        )
+
+    def _doctor_port(self) -> tuple[int | None, str | None]:
+        raw_value = os.environ.get("CODESYS_API_SERVER_PORT", "8080")
+        try:
+            return int(raw_value), None
+        except ValueError:
+            return None, raw_value
+
+    def _check_port_availability(self) -> dict[str, str]:
+        port, raw_port = self._doctor_port()
+        if port is None:
+            return self._doctor_check(
+                name="HTTP port availability",
+                status="FAIL",
+                detail="Invalid CODESYS_API_SERVER_PORT value: {0}".format(raw_port),
+                suggestion="Set CODESYS_API_SERVER_PORT to a valid integer port.",
+            )
+
+        test_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            test_socket.bind(("127.0.0.1", port))
+        except Exception as exc:
+            return self._doctor_check(
+                name="HTTP port availability",
+                status="FAIL",
+                detail="Port {0} is unavailable: {1}".format(port, exc),
+                suggestion="Kill the process using port {0} or change the API port configuration.".format(
+                    port
+                ),
+            )
+        finally:
+            try:
+                test_socket.close()
+            except OSError:
+                self.logger.warning("Failed to close doctor port probe socket")
+
+        return self._doctor_check(
+            name="HTTP port availability",
+            status="PASS",
+            detail="Port {0} is available.".format(port),
+            suggestion="No action required.",
+        )
+
+    def _check_server_connectivity(self) -> dict[str, str]:
+        port, _ = self._doctor_port()
+        if port is None:
+            port = 8080
+        probe_url = "http://127.0.0.1:{0}/api/v1/system/info".format(port)
+        try:
+            with urllib.request.urlopen(probe_url, timeout=1.0) as response:
+                status_code = getattr(response, "status", 200)
+                if isinstance(status_code, int) and status_code >= 400:
+                    return self._doctor_check(
+                        name="Server connectivity",
+                        status="WARN",
+                        detail="Server probe returned HTTP {0} at {1}".format(status_code, probe_url),
+                        suggestion=(
+                            "Server is not running. Start codesys-tools-server if REST API access is needed."
+                        ),
+                    )
+        except (urllib.error.URLError, TimeoutError, OSError) as exc:
+            return self._doctor_check(
+                name="Server connectivity",
+                status="WARN",
+                detail="Server probe failed at {0}: {1}".format(probe_url, exc),
+                suggestion="Server is not running. Start codesys-tools-server if REST API access is needed.",
+            )
+        except Exception as exc:
+            return self._doctor_check(
+                name="Server connectivity",
+                status="WARN",
+                detail="Unexpected connectivity probe failure at {0}: {1}".format(probe_url, exc),
+                suggestion="Server is not running. Start codesys-tools-server if REST API access is needed.",
+            )
+
+        return self._doctor_check(
+            name="Server connectivity",
+            status="PASS",
+            detail="Server probe succeeded: {0}".format(probe_url),
+            suggestion="No action required.",
+        )
+
+    def _system_doctor(self, request: ActionRequest) -> ActionResult:
+        checks: list[dict[str, str]] = []
+        check_functions: list[Callable[[], dict[str, str]]] = [
+            self._check_os_windows,
+            lambda: self._check_python_dependency("win32api", "Install dependency: pip install pywin32"),
+            lambda: self._check_python_dependency("requests", "Install dependency: pip install requests"),
+            self._check_codesys_path_env,
+            self._check_codesys_profile_env,
+            self._check_config_file_validity,
+            self._check_codesys_binary,
+            self._check_named_pipe_creation,
+            self._check_port_availability,
+            self._check_server_connectivity,
+        ]
+
+        for check_fn in check_functions:
+            try:
+                checks.append(check_fn())
+            except Exception as exc:
+                self.logger.exception("System doctor check crashed")
+                checks.append(
+                    self._doctor_check(
+                        name="Doctor internal check failure",
+                        status="FAIL",
+                        detail="Unexpected check crash: {0}".format(exc),
+                        suggestion="Inspect logs and rerun doctor.",
+                    )
+                )
+
+        fail_count = sum(1 for item in checks if item["status"] == "FAIL")
+        warn_count = sum(1 for item in checks if item["status"] == "WARN")
+
+        return ActionResult(
+            body={
+                "success": True,
+                "checks": checks,
+                "summary": {
+                    "total": len(checks),
+                    "failures": fail_count,
+                    "warnings": warn_count,
+                },
+            },
+            request_id=request.request_id,
+        )
+
     def _script_execute(self, request: ActionRequest) -> ActionResult:
         if not self.engine_adapter.capabilities().script_execute:
             return self._unsupported_action(request.action, request.request_id)
@@ -359,6 +744,85 @@ class ActionService:
         )
         status_code = 200 if result.get("success", False) else 500
         return ActionResult(body=result, status_code=status_code, request_id=request.request_id)
+
+    def _project_import_xml(self, request: ActionRequest) -> ActionResult:
+        if not self.engine_adapter.capabilities().project_import_xml:
+            return self._unsupported_action(request.action, request.request_id)
+
+        error = validate_required_params(request.params, ["xml_path"])
+        if error is not None:
+            return ActionResult(
+                body={"success": False, "error": error},
+                status_code=400,
+                request_id=request.request_id,
+            )
+
+        result = self._execute_engine_action(
+            action=request.action,
+            params=request.params,
+            timeout_override=request.timeout,
+        )
+        status_code = 200 if result.get("success", False) else 500
+        return ActionResult(body=result, status_code=status_code, request_id=request.request_id)
+
+    def _project_import_xml_content(self, request: ActionRequest) -> ActionResult:
+        if not self.engine_adapter.capabilities().project_import_xml_content:
+            return self._unsupported_action(request.action, request.request_id)
+
+        error = validate_required_params(request.params, ["xml_content"])
+        if error is not None:
+            return ActionResult(
+                body={"success": False, "error": error},
+                status_code=400,
+                request_id=request.request_id,
+            )
+
+        xml_content = str(request.params["xml_content"])
+        tmp_path = _write_temp_xml(xml_content.encode("utf-8"))
+        try:
+            delegated = ActionRequest(
+                action=ActionType.PROJECT_IMPORT_XML,
+                params={**request.params, "xml_path": tmp_path},
+                timeout=request.timeout,
+                request_id=request.request_id,
+            )
+            return self._project_import_xml(delegated)
+        finally:
+            _remove_temp(tmp_path)
+
+    def _project_import_xml_b64(self, request: ActionRequest) -> ActionResult:
+        if not self.engine_adapter.capabilities().project_import_xml_b64:
+            return self._unsupported_action(request.action, request.request_id)
+
+        error = validate_required_params(request.params, ["xml_b64"])
+        if error is not None:
+            return ActionResult(
+                body={"success": False, "error": error},
+                status_code=400,
+                request_id=request.request_id,
+            )
+
+        import base64
+        try:
+            raw = base64.b64decode(str(request.params["xml_b64"]))
+        except Exception as exc:
+            return ActionResult(
+                body={"success": False, "error": f"Invalid base64: {exc}"},
+                status_code=400,
+                request_id=request.request_id,
+            )
+
+        tmp_path = _write_temp_xml(raw)
+        try:
+            delegated = ActionRequest(
+                action=ActionType.PROJECT_IMPORT_XML,
+                params={**request.params, "xml_path": tmp_path},
+                timeout=request.timeout,
+                request_id=request.request_id,
+            )
+            return self._project_import_xml(delegated)
+        finally:
+            _remove_temp(tmp_path)
 
     def _build_compile_params(
         self,
