@@ -8,6 +8,18 @@ Windows-first, experimental local automation tooling for CODESYS.
 - a local HTTP server: `codesys-tools-server`
 - a persistent CODESYS runtime built around `named_pipe`
 
+## Origin & Evolutions
+
+This project is a significantly evolved fork of the original `codesys-api` (commit `f934cb2`). While the original established the foundation for CODESYS automation, this version has been re-engineered for production-grade reliability and AI-native workflows.
+
+Key improvements over the original fork:
+
+- **Robust IPC**: Replaced the fragile file-based communication (`requests/results` folders) with a high-performance **Windows Named Pipe** transport.
+- **AI-Native (MCP)**: Integrated a **Model Context Protocol (MCP)** server, allowing AI agents (like Claude or Cursor) to interact directly with CODESYS as a first-class tool.
+- **REST API Expansion**: Extended the API surface from 6 to **20 endpoints**, including advanced project management and XML import capabilities.
+- **Environment Diagnostics**: Added `codesys-tools doctor` to automatically detect and suggest fixes for common Windows/CODESYS configuration issues.
+- **Architecture Refactor**: Implemented a clean three-layer execution model (Interface -> Action -> Engine) to ensure stability and cross-session persistence.
+
 ## Product Goal
 
 This project is optimized for user-facing utility, not for any single transport or hosting mechanism.
