@@ -20,13 +20,13 @@ When a multi-layer system fails, follow the **Layer Isolation Protocol**:
 - **Symptom**: CODESYS process starts but terminates immediately or prompts for a profile.
 - **Checks**:
   - Run `codesys-tools doctor` to verify `CODESYS_PATH`.
-  - Use `profile_launch_probe.py --mode all` to check launch string compatibility.
+  - Use `scripts/manual/profile_launch_probe.py --mode all` to check launch string compatibility.
   - **Identity**: CODESYS may fail if launched from a service/sandbox identity (e.g., Codex) that lacks access to the AP Installer Event Logs. Use a normal user terminal for authoritative testing.
 
 ### 3. "Controls created on one thread..." Error
 - **Symptom**: `scriptengine.projects.open()` fails when opening a template (e.g., `Standard.project`).
 - **Fact**: CODESYS templates cannot be opened as normal projects via the script engine due to COM threading constraints.
-- **Fix**: Use `projects.create(path, primary=True)` to create a new empty project instead of opening a template.
+- **Fix**: Use `projects.create(path, True)` to create a new empty project instead of opening a template.
 
 ### 4. Orphan Processes
 - **Symptom**: Residual CODESYS windows remain after a session stop.

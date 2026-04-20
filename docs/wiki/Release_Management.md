@@ -9,7 +9,7 @@ This page tracks the strategic roadmap, release history, and quality gates for t
 - **Key Features**: 
   - `codesys-tools doctor` for automated environment diagnostics.
   - MCP Server for direct integration with AI tools (Claude, Cursor).
-  - Expanded REST API (18 endpoints).
+  - Expanded REST API (20 endpoints).
   - Migration from file-based IPC to **Named Pipes**.
 
 ### Future Phase: Visuals & Ecosystem (v0.5.0)

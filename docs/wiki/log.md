@@ -1,6 +1,7 @@
 # Maintenance Log
 
 ## 2026-04-20
+- **LINT**: Fixed broken links and outdated paths in `Troubleshooting.md`. Updated `index.md` to reflect `docs/raw` removal and updated sync date. Synchronized endpoint counts in `Release_Management.md`.
 - **LINT**: Synchronized REST API endpoint count from 18 to 20 across `AGENT.md` and `Operations.md` based on `http_server.py` implementation (added `import-xml-content` and `import-xml-b64`).
 - **UPDATE**: Updated Mermaid diagram in `Architecture.md` to reflect Named Pipe transport.
 - **CLEANUP**: Removed 23 legacy files from `docs/raw/` and 4 temporary files from `docs/archive/`.
