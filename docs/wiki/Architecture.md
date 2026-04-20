@@ -44,12 +44,10 @@ To maintain stability, the system follows a strict "Boundary Contract":
 graph TD
     User([User/Client]) -->|HTTP/CLI| Interface[Interface Layer]
     Interface -->|Logic| Action[Action Layer]
-    Action -->|Write Request| ReqDir[(/requests)]
-    ReqDir -->|Poll| Engine[Persistent Session - IronPython]
+    Action -->|Named Pipe| Engine[Persistent Session - IronPython]
     Engine -->|COM API| IDE[CODESYS IDE]
     IDE -->|Status| Engine
-    Engine -->|Write Result| ResDir[(/results)]
-    ResDir -->|Read Result| Action
+    Engine -->|Named Pipe| Action
     Action -->|Format| Interface
     Interface -->|Response| User
 ```

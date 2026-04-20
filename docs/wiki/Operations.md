@@ -109,6 +109,8 @@ The HTTP server defaults to port `8080`. All requests require `Authorization: Ap
 | GET  | `/api/v1/project/list` | — | List projects known to the active session. |
 | POST | `/api/v1/project/compile` | — | Build the active project; returns CODESYS message-store counts. |
 | POST | `/api/v1/project/import-xml` | `xml_path` (required) | Import a PLCopen XML file into the active project. |
+| POST | `/api/v1/project/import-xml-content` | `xml_content` (required) | Import XML content directly as a string. |
+| POST | `/api/v1/project/import-xml-b64` | `xml_base64` (required) | Import XML content encoded as Base64. |
 
 ### POU
 
