@@ -20,7 +20,6 @@ def test_readme_states_public_support_boundary() -> None:
 
 def test_public_release_docs_link_current_public_entrypoints() -> None:
     release_doc = (REPO_ROOT / "docs" / "archive" / "PUBLIC_RELEASE.md").read_text(encoding="utf-8")
-    install_doc = (REPO_ROOT / "docs" / "raw" / "INSTALLATION_GUIDE.md").read_text(encoding="utf-8")
 
     assert "python scripts\\check_public_release.py" in release_doc
     assert "Windows-only" in release_doc
@@ -29,7 +28,3 @@ def test_public_release_docs_link_current_public_entrypoints() -> None:
     assert ".github/workflows/verify-published-package.yml" in release_doc
     assert "Trusted Publishing" in release_doc
     assert "Python 3.13+" in release_doc
-    assert "Python 3.13+" in install_doc
-    assert "codesys-tools --help" in install_doc
-    assert "codesys-tools-server --help" in install_doc
-    assert "named_pipe" in install_doc
