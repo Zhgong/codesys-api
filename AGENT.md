@@ -25,26 +25,32 @@ Behavior:
 - CLI human mode: plain text.
 - CLI JSON mode: `--json` prints raw result JSON.
 - REST mode: JSON response body for every endpoint.
+- MCP mode: Structured tool responses for AI agents.
 
 ## Architecture & Execution Pipeline (For AI Context)
 
 ### The Flow
 Every command follows a three-layer execution path:
-1.  **CLI / REST Layer** (`src/codesys_api/cli_entry.py` / `HTTP_SERVER.py`): Entry points responsible for parameter parsing, authentication, and formatting the final output.
-2.  **Action Layer** (`src/codesys_api/action_layer.py`): The core orchestrator. It handles business logic, state management, and environment validation (e.g., running `doctor` checks before critical operations).
-3.  **Engine Layer** (`PERSISTENT_SESSION.py`): The low-level executor running inside the CODESYS environment (IronPython 2.7). It performs the actual automation tasks like opening projects or compiling POUs.
+1.  **Interface Layer** (`src/codesys_api/cli_entry.py` / `http_server.py` / `mcp_server.py`): Entry points for CLI, REST API, and Model Context Protocol.
+2.  **Action Layer** (`src/codesys_api/action_layer.py`): The core orchestrator. Handles business logic, state management, and environment validation.
+3.  **Engine Layer** (`PERSISTENT_SESSION.py`): Low-level executor running inside CODESYS (IronPython 2.7).
 
-### IPC Communication Mechanism
-The **Action Layer** and **Engine Layer** communicate asynchronously via the file system:
-- **Requests**: The Action Layer writes a JSON request file into the `requests/` directory.
-- **Results**: The Engine Layer (polling `requests/`) processes the file and writes a corresponding JSON result file into the `results/` directory.
-- **Timeout**: The Action Layer waits for the result file with a configurable timeout.
+### IPC Communication Mechanism (Named Pipe)
+The **Action Layer** and **Engine Layer** communicate via a Windows **Named Pipe**:
+- **Transport**: `src/codesys_api/named_pipe_transport.py`.
+- **Reliability**: Replaced the legacy file-based transport for higher performance and stability.
+- **Bi-directional**: Supports direct command sending and JSON result retrieval.
+
+### MCP Server (AI Integration)
+The project includes a built-in MCP server for direct integration with AI tools:
+- Entry point: `codesys-tools-mcp`
+- Default: SSE transport on `0.0.0.0:8001`.
+- Configuration: `CODESYS_API_MCP_PORT`, `CODESYS_API_MCP_HOST`.
 
 ### Debugging for AI Agents
-When an operation fails, follow this diagnostic path:
-1.  **Process/Network Failure**: If the CLI cannot connect or the server won't start, run `codesys-tools doctor` or check the server logs. This usually indicates an environment or configuration issue.
-2.  **HTTP 500 / Execution Failure**: If you receive an HTTP 500 or a JSON response with `success: false`, the error likely occurred within the **Engine Layer** (inside CODESYS). Check the `error` field in the JSON response for details.
-3.  **Critical Rule**: **Never manually modify files in the `requests/` directory.** This can corrupt the IPC state. Use the CLI or REST API to interact with the system.
+1.  **Environment Issues**: Run `codesys-tools doctor`.
+2.  **Session Issues**: Check `session status`. If stale, use `session restart`.
+3.  **Logic Errors**: Inspect the `error` field in JSON responses.
 
 ## CLI Command Hierarchy
 
@@ -56,154 +62,35 @@ resources:
   session  (start | status | restart | stop)
   project  (create | open | save | close | list | compile)
   pou      (create | list | code)
-```
-
-Examples:
-
-```bash
-codesys-tools session start
-codesys-tools project create --path C:\work\demo.project
-codesys-tools project compile --clean-build
-codesys-tools pou create --name MotorController --type FunctionBlock --language ST
-codesys-tools pou list --parent-path Application
-codesys-tools pou code --path Application\PLC_PRG --implementation-file plc_prg_impl.txt
+  system   (info | logs)
 ```
 
 ## REST API Reference
 
 ### Base URL and Auth
-- Base URL: `http://127.0.0.1:8080` (default port `8080`).
+- Base URL: `http://127.0.0.1:8080` (default).
 - Header: `Authorization: ApiKey <token>`.
-- Content type: `application/json`.
 
-### Endpoint to ActionType Mapping
+### Key Endpoints (20 Total)
 
-| Method | Path | ActionType |
-| --- | --- | --- |
-| POST | `/api/v1/session/start` | `session.start` |
-| POST | `/api/v1/session/stop` | `session.stop` |
-| POST | `/api/v1/session/restart` | `session.restart` |
-| GET | `/api/v1/session/status` | `session.status` |
-| POST | `/api/v1/project/create` | `project.create` |
-| POST | `/api/v1/project/open` | `project.open` |
-| POST | `/api/v1/project/save` | `project.save` |
-| POST | `/api/v1/project/close` | `project.close` |
-| GET | `/api/v1/project/list` | `project.list` |
-| POST | `/api/v1/project/compile` | `project.compile` |
-| POST | `/api/v1/pou/create` | `pou.create` |
-| GET | `/api/v1/pou/list` | `pou.list` |
-| POST | `/api/v1/pou/code` | `pou.code` |
-| POST | `/api/v1/script/execute` | `script.execute` |
-| GET | `/api/v1/system/info` | direct handler (not ActionType) |
-| GET | `/api/v1/system/logs` | direct handler (not ActionType) |
-
-Note:
-- `doctor` is currently CLI-only (`codesys-tools doctor`), not exposed as a REST endpoint.
-
-### Common JSON Payload Examples
-
-Start session:
-
-```http
-POST /api/v1/session/start
-Authorization: ApiKey <token>
-Content-Type: application/json
-
-{}
-```
-
-Compile project:
-
-```http
-POST /api/v1/project/compile
-Authorization: ApiKey <token>
-Content-Type: application/json
-
-{
-  "clean_build": true
-}
-```
-
-Update POU implementation:
-
-```http
-POST /api/v1/pou/code
-Authorization: ApiKey <token>
-Content-Type: application/json
-
-{
-  "path": "Application/PLC_PRG",
-  "implementation": "PROGRAM PLC_PRG\nVAR\nEND_VAR\n"
-}
-```
+| Category | Endpoints |
+| --- | --- |
+| **Session** | `/api/v1/session/start`, `/stop`, `/restart`, `/status` |
+| **Project** | `/api/v1/project/create`, `/open`, `/save`, `/close`, `/list`, `/compile` |
+| **POU** | `/api/v1/pou/create`, `/list`, `/code` (GET/POST) |
+| **Script** | `/api/v1/script/execute` |
+| **System** | `/api/v1/system/info`, `/logs`, `/health` |
 
 ## Error Handling and Resilience
 
 ### Success Contract
-- Business result is in `body.success` (boolean).
-- Do not trust HTTP status code alone; inspect `success` and `error`.
-
-### HTTP Status Usage
-- `200`: request handled (can still contain `success: false` in edge cases).
-- `400`: invalid/missing parameters.
-- `401`: authentication failed.
-- `404`: unknown endpoint.
-- `500`: runtime or execution failure.
-- `501`: action not supported by active engine adapter.
-
-### Runtime Resilience Guidance
-- On startup issues:
-  1. Run `codesys-tools doctor`.
-  2. Check `CODESYS_API_CODESYS_PATH` and dependency checks.
-- On transient runtime failures/timeouts:
-  1. Query `session status`.
-  2. Retry with bounded backoff.
-  3. Use `session restart` when pipe/session is stale.
-- On compile failures:
-  1. Parse `message_counts`.
-  2. Treat compile errors as non-retriable until source/config changes.
+- Inspect `body.success` (boolean) and `error` (string).
+- HTTP 500 typically indicates an Engine Layer exception inside CODESYS.
 
 ## AI Prompt Cheatsheet
+- "Run `codesys-tools doctor --json` and fix any FAILs."
+- "Start session and compile project `C:\path\to\proj`."
+- "Execute this raw snippet via script/execute."
 
-Use prompts with explicit action, inputs, and output mode:
-
-- "Run `codesys-tools doctor --json`, summarize only FAIL items and concrete fixes."
-- "Start a session, create `C:\\work\\demo.project`, compile with clean build, return JSON outputs."
-- "List POUs under `Application`, then update `Application/PLC_PRG` implementation from this snippet."
-- "When REST call fails, report: endpoint, status code, success flag, error field, and next retry action."
-
-## LLM Wiki Gardener Schema (AI-Maintained Knowledge)
-
-### Core Philosophy
-The `docs/` folder is divided into `raw/` (immutable sources) and `wiki/` (AI-maintained structured knowledge). The AI agent acts as the "gardener," ensuring the wiki remains synchronized, accurate, and high-density.
-
-### Structure
-- `docs/raw/`: Place new transcripts, meeting notes, or raw technical documents here.
-- `docs/wiki/index.md`: The high-level map. Every wiki page must be linked here.
-- `docs/wiki/log.md`: Chronological log of all wiki maintenance (ingest, query, lint).
-- `docs/wiki/*.md`: Entity/Concept pages (e.g., `Architecture.md`, `Troubleshooting.md`).
-
-### Gardener Workflows
-
-#### 1. Ingest (New Information)
-When a new file is added to `docs/raw/` or new context is discovered:
-1. **Read**: Analyze the raw content.
-2. **Synthesize**: Update existing entity pages in `docs/wiki/` or create a new one.
-3. **Index**: Ensure `docs/wiki/index.md` reflects any new pages or major sections.
-4. **Log**: Append an entry to `docs/wiki/log.md` with: `[YYYY-MM-DD] INGEST: <source_file> -> <target_wiki_pages>`.
-
-#### 2. Query (Answering Questions)
-When asked a technical question about the project:
-1. **Locate**: Check `docs/wiki/index.md` to find the relevant entity pages.
-2. **Synthesize**: Formulate the answer using the wiki context.
-3. **Self-Correct**: If the answer isn't in the wiki but is found in the codebase, **file it back into the wiki** immediately.
-4. **Log**: (Optional for complex queries) `[YYYY-MM-DD] QUERY: <question_summary> -> <resolution_status>`.
-
-#### 3. Lint (Maintenance)
-Periodically or when contradictions are found:
-1. **Identify**: Find stale information or broken links between wiki pages.
-2. **Resolve**: Update the wiki to reflect the current state of the codebase.
-3. **Log**: `[YYYY-MM-DD] LINT: Fixed <contradiction/link> in <page>`.
-
-### Constraint: Atomic Updates
-Always keep wiki pages dense and context-rich. Avoid "chatty" summaries; focus on technical facts, architectural diagrams (Mermaid), and precise command references.
+## LLM Wiki Gardener Schema
+Documentation is split into `docs/raw/` (sources) and `docs/wiki/` (AI-maintained synthesis). Use `docs/wiki/index.md` as your primary knowledge map.

@@ -11,9 +11,8 @@ Welcome to the AI-maintained wiki for the Codesys-API project.
 ## Repository Map
 - `/src`: Python 3 source code for CLI and HTTP server.
 - `/PERSISTENT_SESSION.py`: IronPython 2.7 engine running inside CODESYS.
-- `/docs/raw`: Unprocessed source documents.
 - `/docs/wiki`: This structured knowledge base.
 
 ## Maintenance
-- Last Gardener Sync: 2026-04-15
+- Last Gardener Sync: 2026-04-20
 - [[log|View Maintenance Log]]

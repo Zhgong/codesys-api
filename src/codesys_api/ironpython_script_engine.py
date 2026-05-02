@@ -684,7 +684,7 @@ try:
             if "METHOD" in full_code and hasattr(target, "create_method"):
                 # Simple extraction of METHOD name from ST: METHOD <Name> : <Type>
                 import re
-                method_matches = re.findall(r"METHOD\s+(\w+)", full_code, re.IGNORECASE)
+                method_matches = re.findall(r"METHOD\\s+(\\w+)", full_code, re.IGNORECASE)
                 for m_name in method_matches:
                     try:
                         # Create method object if it doesn't exist

@@ -8,6 +8,18 @@ Windows-first, experimental local automation tooling for CODESYS.
 - a local HTTP server: `codesys-tools-server`
 - a persistent CODESYS runtime built around `named_pipe`
 
+## Origin & Evolutions
+
+This project is a significantly evolved fork of the original `codesys-api` (commit `f934cb2`). While the original established the foundation for CODESYS automation, this version has been re-engineered for production-grade reliability and AI-native workflows.
+
+Key improvements over the original fork:
+
+- **Robust IPC**: Replaced the fragile file-based communication (`requests/results` folders) with a high-performance **Windows Named Pipe** transport.
+- **AI-Native (MCP)**: Integrated a **Model Context Protocol (MCP)** server, allowing AI agents (like Claude or Cursor) to interact directly with CODESYS as a first-class tool.
+- **REST API Expansion**: Extended the API surface from 6 to **20 endpoints**, including advanced project management and XML import capabilities.
+- **Environment Diagnostics**: Added `codesys-tools doctor` to automatically detect and suggest fixes for common Windows/CODESYS configuration issues.
+- **Architecture Refactor**: Implemented a clean three-layer execution model (Interface -> Action -> Engine) to ensure stability and cross-session persistence.
+
 ## Product Goal
 
 This project is optimized for user-facing utility, not for any single transport or hosting mechanism.
@@ -152,13 +164,14 @@ Current release validation:
 
 ## Documentation
 
-- [docs/CLI_USAGE.md](docs/CLI_USAGE.md): CLI commands and examples
-- [docs/INSTALLATION_GUIDE.md](docs/INSTALLATION_GUIDE.md): installation and local setup
-- [docs/PACKAGING.md](docs/PACKAGING.md): build and wheel verification flow
-- [docs/RELEASE.md](docs/RELEASE.md): internal wheel release checklist
-- [docs/PUBLIC_RELEASE.md](docs/PUBLIC_RELEASE.md): public release preparation checklist
-- [docs/BASELINE.md](docs/BASELINE.md): baseline gates and validation commands
-- [.github/workflows](.github/workflows): CI, release-build, and manual publish workflows
+Comprehensive documentation is available in the **[AI-Maintained Wiki](docs/wiki/index.md)**:
+
+- **[Architecture](docs/wiki/Architecture.md)**: System design and Named Pipe IPC mechanism.
+- **[Operations](docs/wiki/Operations.md)**: Installation, CLI commands, REST API, and MCP server config.
+- **[Troubleshooting](docs/wiki/Troubleshooting.md)**: Common issues and debugging methodology.
+- **[Release Management](docs/wiki/Release_Management.md)**: Strategic plans and release notes.
+
+Legacy source documents are archived in `docs/archive/`.
 
 ## Not Included
 

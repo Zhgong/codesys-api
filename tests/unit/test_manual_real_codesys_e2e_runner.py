@@ -133,6 +133,10 @@ def test_main_reports_missing_required_env_vars(monkeypatch: Any, capsys: Any, t
     env_file.write_text("CODESYS_API_CODESYS_PATH=C:\\demo\\CODESYS.exe\n", encoding="utf-8")
     monkeypatch.setattr(module, "LOCAL_ENV_FILE", env_file)
     monkeypatch.setattr(module, "resolve_windows_identity", lambda: r"WIN11\vboxuser")
+    # Remove system env vars that would satisfy the required-vars check and cause the
+    # runner to proceed instead of returning exit code 2.
+    monkeypatch.delenv("CODESYS_API_CODESYS_PROFILE", raising=False)
+    monkeypatch.delenv("CODESYS_API_CODESYS_PROFILE_PATH", raising=False)
 
     exit_code = module.main([])
 
